@@ -27,7 +27,7 @@ class ReviewGenerator:
         self.client = OpenAI(
             base_url=OPENROUTER_BASE_URL,
             api_key=OPENROUTER_API_KEY,
-            headers={"HTTP-Referer": "http://localhost:8501"}
+            default_headers={"HTTP-Referer": "http://localhost:8501"}
         )
         self.workflow = self._create_workflow()
 
