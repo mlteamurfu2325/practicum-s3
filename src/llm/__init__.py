@@ -114,7 +114,8 @@ class ReviewGenerator:
         # Set entry point
         workflow.set_entry_point("validate")
 
-        return workflow
+        # Compile the workflow
+        return workflow.compile()
 
     def generate_review(
         self,
@@ -146,7 +147,7 @@ class ReviewGenerator:
 
         try:
             # Run the workflow
-            final_state = self.workflow.run(initial_state)
+            final_state = self.workflow(initial_state)
 
             # Check validation result
             if not final_state["validation_result"]["is_valid"]:
