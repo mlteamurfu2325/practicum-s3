@@ -1,0 +1,17 @@
+# ignore hidden files and dirs
+.*
+
+# do not ignore .gitignore itself
+!.gitignore
+
+# do not ignore .github
+!.github
+
+# do not ignore custom hooks
+!.hooks
+
+# do not ignore .pre-commit-config.yaml
+!.pre-commit-config.yaml
+
+# ignore Python cache
+**/__pycache__/
