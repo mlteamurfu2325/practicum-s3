@@ -11,11 +11,11 @@ VALIDATION_PROMPT = (
 
 Проверь следующие критерии и ответь строго в формате JSON """
     """(с запятыми между полями):
-{
+{{
     "is_valid": true/false,
     "error_type": null/"non_russian"/"nsfw"/"irrelevant"/"gibberish",
     "explanation": "причина отклонения, если есть"
-}
+}}
 
 Критерии проверки:
 1. Текст на русском языке
@@ -76,17 +76,17 @@ SELF_CHECK_PROMPT = (
 
 Оцени по критериям и верни результат строго в формате JSON """
     """(с запятыми между полями):
-{
-    "scores": {
+{{
+    "scores": {{
         "theme_relevance": 0-10,
         "rating_match": 0-10,
         "language_quality": 0-10,
         "consistency": 0-10,
         "category_specificity": 0-10
-    },
+    }},
     "verdict": "accept"/"reject",
     "issues": ["список проблем, если есть"]
-}
+}}
 
 Пояснения к критериям:
 1. theme_relevance: Насколько отзыв соответствует заданной теме
