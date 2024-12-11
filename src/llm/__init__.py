@@ -146,8 +146,8 @@ class ReviewGenerator:
         }
 
         try:
-            # Run the workflow
-            final_state = self.workflow(initial_state)
+            # Run the workflow using invoke
+            final_state = self.workflow.invoke(initial_state)
 
             # Check validation result
             if not final_state["validation_result"]["is_valid"]:
