@@ -51,11 +51,20 @@ def clean_json_response(content: str) -> str:
     # Remove any leading/trailing whitespace
     content = content.strip()
     
-    # Add missing commas between properties if needed
-    content = re.sub(r'"\s*\n\s*"', '",\n"', content)
-    content = re.sub(r'true\s*\n\s*"', 'true,\n"', content)
-    content = re.sub(r'false\s*\n\s*"', 'false,\n"', content)
-    content = re.sub(r'null\s*\n\s*"', 'null,\n"', content)
+    # Add missing commas between properties at any level
+    def add_commas(match):
+        """Add comma after the value if needed."""
+        value = match.group(1)
+        next_char = match.group(2)
+        if value in ['true', 'false', 'null'] or value.isdigit():
+            return f'{value},{next_char}'
+        if value.endswith('"'):
+            return f'{value},{next_char}'
+        return f'{value}{next_char}'
+    
+    # Match any JSON value followed by a newline and another property
+    pattern = r'(true|false|null|\d+|"[^"]*")\s*\n\s*(["{])'
+    content = re.sub(pattern, add_commas, content)
     
     logger.info(f"Cleaned JSON content: {content}")
     return content
