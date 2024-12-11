@@ -1,7 +1,8 @@
 """LLM integration package for review generation."""
 from typing import Dict, Optional, Tuple
+from typing_extensions import TypedDict
 
-from langgraph.graph import Graph
+from langgraph.graph import StateGraph
 from openai import OpenAI
 import json
 
@@ -19,6 +20,17 @@ from src.llm.prompts import (
 )
 
 
+class ReviewState(TypedDict):
+    """Type for the review generation state."""
+    theme: str
+    rating: int
+    category: str
+    attempts: int
+    validation_result: Optional[Dict]
+    generated_review: Optional[str]
+    check_result: Optional[Dict]
+
+
 class ReviewGenerator:
     """Main class for generating reviews using LLM."""
 
@@ -31,10 +43,13 @@ class ReviewGenerator:
         )
         self.workflow = self._create_workflow()
 
-    def _create_workflow(self) -> Graph:
+    def _create_workflow(self) -> StateGraph:
         """Create the LangGraph workflow for review generation."""
+        # Create a state graph
+        workflow = StateGraph(ReviewState)
+
         # Define the nodes
-        def validate(state) -> Dict:
+        def validate(state: ReviewState) -> ReviewState:
             """Validate user input."""
             response = self.client.chat.completions.create(
                 model=MODEL_NAME,
@@ -46,13 +61,10 @@ class ReviewGenerator:
                 }]
             )
             result = json.loads(response.choices[0].message.content)
-            return {
-                **state,
-                "validation_result": result,
-                "should_generate": result["is_valid"]
-            }
+            state["validation_result"] = result
+            return state
 
-        def generate(state) -> Dict:
+        def generate(state: ReviewState) -> ReviewState:
             """Generate review based on parameters."""
             response = self.client.chat.completions.create(
                 model=MODEL_NAME,
@@ -65,13 +77,10 @@ class ReviewGenerator:
                     )
                 }]
             )
-            return {
-                **state,
-                "generated_review": response.choices[0].message.content,
-                "should_check": True
-            }
+            state["generated_review"] = response.choices[0].message.content
+            return state
 
-        def check(state) -> Dict:
+        def check(state: ReviewState) -> ReviewState:
             """Perform self-check of generated review."""
             response = self.client.chat.completions.create(
                 model=MODEL_NAME,
@@ -85,31 +94,39 @@ class ReviewGenerator:
                     )
                 }]
             )
-            check_result = json.loads(response.choices[0].message.content)
-            scores = check_result["scores"]
-            passed = all(
-                scores[k] >= QUALITY_THRESHOLD[k]
-                for k in QUALITY_THRESHOLD
+            state["check_result"] = json.loads(
+                response.choices[0].message.content
             )
-            return {
-                **state,
-                "check_result": check_result,
-                "should_regenerate": not passed and state["attempts"] < 3,
-                "should_return": passed or state["attempts"] >= 3
-            }
-
-        # Create the graph
-        workflow = Graph()
+            state["attempts"] += 1
+            return state
 
         # Add nodes
         workflow.add_node("validate", validate)
         workflow.add_node("generate", generate)
         workflow.add_node("check", check)
 
+        # Define conditional edges
+        def should_generate(state: ReviewState) -> str:
+            """Determine if we should proceed to generation."""
+            return (
+                "generate" if state["validation_result"]["is_valid"] else "end"
+            )
+
+        def should_regenerate(state: ReviewState) -> str:
+            """Determine if we should regenerate the review."""
+            if state["attempts"] >= 3:
+                return "end"
+            scores = state["check_result"]["scores"]
+            passed = all(
+                scores[k] >= QUALITY_THRESHOLD[k]
+                for k in QUALITY_THRESHOLD
+            )
+            return "end" if passed else "generate"
+
         # Add edges
-        workflow.add_edge("validate", "generate")
+        workflow.add_edge("validate", should_generate)
         workflow.add_edge("generate", "check")
-        workflow.add_edge("check", "generate")
+        workflow.add_edge("check", should_regenerate)
 
         # Set entry point
         workflow.set_entry_point("validate")
@@ -134,19 +151,18 @@ class ReviewGenerator:
         Returns:
             Tuple of (review text, error message if any)
         """
-        initial_state = {
+        initial_state: ReviewState = {
             "theme": theme,
             "rating": rating,
             "category": category,
             "attempts": 0,
-            "should_generate": False,
-            "should_check": False,
-            "should_regenerate": False,
-            "should_return": False
+            "validation_result": None,
+            "generated_review": None,
+            "check_result": None
         }
 
         try:
-            # Run the workflow using invoke
+            # Run the workflow
             final_state = self.workflow.invoke(initial_state)
 
             # Check validation result
@@ -155,15 +171,14 @@ class ReviewGenerator:
                 return None, ERROR_MESSAGES[error_type]
 
             # Return generated review if quality check passed
-            if final_state["check_result"]["verdict"] == "accept":
-                return final_state["generated_review"], None
-
-            # If we reached max attempts, return the best review we got
-            if final_state["attempts"] >= 3:
-                return (
-                    final_state["generated_review"],
-                    "Качество отзыва может быть не оптимальным."
-                )
+            if final_state.get("check_result"):
+                if final_state["check_result"]["verdict"] == "accept":
+                    return final_state["generated_review"], None
+                elif final_state["attempts"] >= 3:
+                    return (
+                        final_state["generated_review"],
+                        "Качество отзыва может быть не оптимальным."
+                    )
 
             return None, ERROR_MESSAGES["validation_failed"]
 
