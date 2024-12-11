@@ -1,5 +1,10 @@
 import streamlit as st
+from src.llm import ReviewGenerator
 
+
+# Initialize ReviewGenerator in session state if not exists
+if 'review_generator' not in st.session_state:
+    st.session_state.review_generator = ReviewGenerator()
 
 # Page configuration
 st.set_page_config(
@@ -15,12 +20,12 @@ st.markdown("""
     .main {
         padding: 2rem;
     }
-    
+
     /* Card styling */
     .stApp {
         background-color: #0e1117;
     }
-    
+
     .card {
         background-color: #1e2227;
         padding: 2rem;
@@ -28,7 +33,7 @@ st.markdown("""
         border: 1px solid #2e3238;
         margin-bottom: 2rem;
     }
-    
+
     /* Input styling */
     .stTextInput > div > div > input {
         background-color: #262730;
@@ -37,7 +42,7 @@ st.markdown("""
         font-size: 1rem;
         border-radius: 8px;
     }
-    
+
     .stNumberInput > div > div > input {
         background-color: #262730;
         border: 1px solid #3e4247;
@@ -45,7 +50,7 @@ st.markdown("""
         font-size: 1rem;
         border-radius: 8px;
     }
-    
+
     /* Button styling */
     .stButton > button {
         width: 100%;
@@ -59,11 +64,11 @@ st.markdown("""
         cursor: pointer;
         transition: transform 0.2s;
     }
-    
+
     .stButton > button:hover {
         transform: translateY(-2px);
     }
-    
+
     /* Text area styling */
     .stTextArea > div > div > textarea {
         background-color: #262730;
@@ -73,20 +78,20 @@ st.markdown("""
         border-radius: 8px;
         color: #fafafa;
     }
-    
+
     /* Headers styling */
     h1, h2, h3 {
         color: #fafafa;
         margin-bottom: 1.5rem;
     }
-    
+
     .big-font {
         color: #fafafa;
         font-size: 1.2rem !important;
         margin-bottom: 0.5rem;
         font-weight: 500;
     }
-    
+
     /* Error message styling */
     .stAlert {
         background-color: #3e1c1c;
@@ -94,6 +99,20 @@ st.markdown("""
         color: #ff4b4b;
         padding: 1rem;
         border-radius: 8px;
+    }
+
+    /* Warning message styling */
+    .stWarning {
+        background-color: #3e351c;
+        border: 1px solid #ffd700;
+        color: #ffd700;
+        padding: 1rem;
+        border-radius: 8px;
+    }
+
+    /* Loading spinner styling */
+    .stSpinner > div {
+        border-color: #FF4B2B !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -163,16 +182,25 @@ if generate:
     if not theme or not category:
         st.error("Пожалуйста, заполните все поля!")
     else:
-        st.markdown(
-            '<div class="card">'
-            '<h2>🏁 Ваш отзыв готов!</h2>',
-            unsafe_allow_html=True
-        )
-        mockup_review = "Здесь будет находиться текст сгенерированного отзыва"
-        st.text_area(
-            "Сгенерированный отзыв",
-            mockup_review,
-            height=200,
-            label_visibility="collapsed"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.spinner("Генерируем отзыв..."):
+            review, error = st.session_state.review_generator.generate_review(
+                theme=theme,
+                rating=rating,
+                category=category
+            )
+
+        if error:
+            st.error(error)
+        else:
+            st.markdown(
+                '<div class="card">'
+                '<h2>🏁 Ваш отзыв готов!</h2>',
+                unsafe_allow_html=True
+            )
+            st.text_area(
+                "Сгенерированный отзыв",
+                review,
+                height=200,
+                label_visibility="collapsed"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
