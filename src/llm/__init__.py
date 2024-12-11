@@ -3,6 +3,7 @@ from typing import Dict, Optional, Tuple
 from typing_extensions import TypedDict
 import logging
 import sys
+import re
 
 from langgraph.graph import StateGraph
 from openai import OpenAI
@@ -41,14 +42,35 @@ class ReviewState(TypedDict):
     check_result: Optional[Dict]
 
 
+def clean_json_response(content: str) -> str:
+    """Clean JSON response from markdown and formatting artifacts."""
+    # Remove markdown code block markers
+    content = re.sub(r'```(?:json)?\n', '', content)
+    content = content.replace('```', '')
+    
+    # Remove any leading/trailing whitespace
+    content = content.strip()
+    
+    # Add missing commas between properties if needed
+    content = re.sub(r'"\s*\n\s*"', '",\n"', content)
+    content = re.sub(r'true\s*\n\s*"', 'true,\n"', content)
+    content = re.sub(r'false\s*\n\s*"', 'false,\n"', content)
+    content = re.sub(r'null\s*\n\s*"', 'null,\n"', content)
+    
+    logger.info(f"Cleaned JSON content: {content}")
+    return content
+
+
 def parse_json_response(content: str, step: str) -> Dict:
     """Safely parse JSON response with logging."""
     logger.info(f"Parsing {step} response: {content}")
     try:
-        return json.loads(content)
+        cleaned_content = clean_json_response(content)
+        return json.loads(cleaned_content)
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse {step} JSON response: {str(e)}")
         logger.error(f"Raw content: {content}")
+        logger.error(f"Cleaned content: {cleaned_content}")
         raise ValueError(
             f"Invalid JSON response from {step}. Raw content: {content}"
         )
