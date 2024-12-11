@@ -100,10 +100,15 @@ class ReviewGenerator:
             state["attempts"] += 1
             return state
 
+        def end(state: ReviewState) -> ReviewState:
+            """End node that returns the final state."""
+            return state
+
         # Add nodes
         workflow.add_node("validate", validate)
         workflow.add_node("generate", generate)
         workflow.add_node("check", check)
+        workflow.add_node("end", end)
 
         # Define conditional edges
         def should_generate(state: ReviewState) -> str:
@@ -123,10 +128,24 @@ class ReviewGenerator:
             )
             return "end" if passed else "generate"
 
-        # Add edges
-        workflow.add_edge("validate", should_generate)
+        # Add edges with conditional routing
+        workflow.add_conditional_edges(
+            "validate",
+            should_generate,
+            {
+                "generate": "generate",
+                "end": "end"
+            }
+        )
         workflow.add_edge("generate", "check")
-        workflow.add_edge("check", should_regenerate)
+        workflow.add_conditional_edges(
+            "check",
+            should_regenerate,
+            {
+                "generate": "generate",
+                "end": "end"
+            }
+        )
 
         # Set entry point
         workflow.set_entry_point("validate")
