@@ -7,6 +7,7 @@
 - Python 3.8 или выше
 - pip (менеджер пакетов Python)
 - Git
+- Доступ к интернету (для работы с OpenRouter API)
 
 ## Установка
 
@@ -20,6 +21,14 @@ cd practicum-s3
 ```bash
 pip install -r requirements.txt
 ```
+
+3. Настройка переменных окружения:
+   - Создайте файл `.env` в корневой директории проекта
+   - Добавьте следующие переменные:
+   ```
+   OPENROUTER_API_KEY=your_api_key_here
+   ```
+   Получите API ключ на сайте OpenRouter: https://openrouter.ai/
 
 ## Локальный запуск
 
@@ -46,6 +55,11 @@ sudo apt install python3 python3-pip
 ```
 
 3. Клонируйте репозиторий и установите зависимости как описано выше.
+
+4. Настройте переменные окружения:
+```bash
+echo "OPENROUTER_API_KEY=your_api_key_here" > .env
+```
 
 ### Запуск приложения
 
@@ -74,6 +88,7 @@ After=network.target
 [Service]
 User=your_username
 WorkingDirectory=/path/to/practicum-s3
+Environment="OPENROUTER_API_KEY=your_api_key_here"
 ExecStart=/usr/local/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501
 Restart=always
 
@@ -94,7 +109,14 @@ sudo systemctl start streamlit-review-generator
 sudo ufw allow 8501
 ```
 
-2. Для дополнительной безопасности рекомендуется настроить Nginx как обратный прокси-сервер и SSL-сертификат.
+2. Для дополнительной безопасности рекомендуется:
+   - Настроить Nginx как обратный прокси-сервер
+   - Настроить SSL-сертификат
+   - Защитить файл .env и systemd service файл с API ключом:
+   ```bash
+   chmod 600 .env
+   sudo chmod 600 /etc/systemd/system/streamlit-review-generator.service
+   ```
 
 ## Проверка работоспособности
 
@@ -102,6 +124,7 @@ sudo ufw allow 8501
 1. Приложение доступно по указанному адресу
 2. Все компоненты интерфейса отображаются корректно
 3. Форма генерации отзывов работает правильно
+4. LLM интеграция работает (проверьте генерацию тестового отзыва)
 
 ## Устранение неполадок
 
@@ -109,11 +132,18 @@ sudo ufw allow 8501
    - Установлены ли все зависимости
    - Правильность путей к файлам
    - Наличие необходимых прав доступа
+   - Наличие и правильность .env файла
+   - Доступность OpenRouter API
 
 2. Если приложение недоступно извне:
    - Проверьте настройки файрвола
    - Убедитесь, что указан правильный адрес сервера (0.0.0.0)
    - Проверьте, что порт 8501 открыт и не занят другим процессом
+
+3. Если не работает генерация отзывов:
+   - Проверьте подключение к интернету
+   - Проверьте правильность API ключа
+   - Проверьте логи на наличие ошибок от OpenRouter API
 
 ## Обновление приложения
 
@@ -122,4 +152,3 @@ sudo ufw allow 8501
 git pull origin main
 pip install -r requirements.txt --upgrade
 sudo systemctl restart streamlit-review-generator  # если используется systemd
-```
