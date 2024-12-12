@@ -8,8 +8,8 @@ import torch
 INPUT_PARQUET = "data/geo-reviews-dataset-2023-updated.parquet"
 OUTPUT_PARQUET = "data/geo-reviews-enriched.parquet"
 
-# Configuration
-BATCH_SIZE = 64  # Adjust based on GPU memory
+# Configuration that works on VPS RTX 4090 (24GB)
+BATCH_SIZE = 16  # Adjust based on GPU memory
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
