@@ -5,8 +5,8 @@ import torch
 
 
 # Paths
-INPUT_PARQUET = "../data/geo-reviews-dataset-2023-updated.parquet"
-OUTPUT_PARQUET = "../data/geo-reviews-enriched.parquet"
+INPUT_PARQUET = "data/geo-reviews-dataset-2023-updated.parquet"
+OUTPUT_PARQUET = "data/geo-reviews-enriched.parquet"
 
 # Configuration
 BATCH_SIZE = 64  # Adjust based on GPU memory

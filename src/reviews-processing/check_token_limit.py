@@ -4,10 +4,10 @@ from tqdm import tqdm
 
 
 # Path to the original Parquet file
-parquet_file_path = "../data/geo-reviews-dataset-2023.parquet"
+parquet_file_path = "data/geo-reviews-dataset-2023.parquet"
 
 # Path for the updated Parquet file
-updated_parquet_path = "../data/geo-reviews-dataset-2023-updated.parquet"
+updated_parquet_path = "data/geo-reviews-dataset-2023-updated.parquet"
 
 # Token limit
 TOKEN_LIMIT = 2048
