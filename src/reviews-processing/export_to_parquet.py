@@ -3,10 +3,10 @@ from tqdm import tqdm
 
 
 # Path to the .tskv file
-tskv_file_path = "geo-reviews-dataset-2023.tskv"
+tskv_file_path = "../data/geo-reviews-dataset-2023.tskv"
 
 # Output Parquet file path
-parquet_file_path = "geo-reviews-dataset-2023.parquet"
+parquet_file_path = "../data/geo-reviews-dataset-2023.parquet"
 
 
 # Function to parse a single .tskv line into a dictionary
