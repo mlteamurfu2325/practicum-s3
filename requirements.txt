@@ -2,3 +2,8 @@
 pre-commit
 ruff
 streamlit
+
+# llm
+langgraph
+openai  # openrouter uses openai-compatible API
+python-dotenv  # for environment variables management
