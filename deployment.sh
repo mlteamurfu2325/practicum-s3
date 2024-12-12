@@ -108,7 +108,7 @@ if ! check_md5sum "data/geo-reviews-enriched.parquet" "85fa8d4819131e645b72f5361
         mkdir -p data
         wget -O data/geo-reviews-dataset-2023.tskv https://github.com/yandex/geo-reviews-dataset-2023/raw/refs/heads/master/geo-reviews-dataset-2023.tskv
         
-        if ! check_md5sum "data/geo-reviews-dataset-2023.tskv" "0fddcdd0cfafed1c1fc0f5e74def5996"; then
+        if ! check_md5sum "data/geo-reviews-dataset-2023.tskv" "857fe8ae8af5f5165da3e1674e6f588a"; then
             echo "✗ Error: Downloaded file has incorrect md5sum"
             exit 1
         fi
