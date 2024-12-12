@@ -15,3 +15,6 @@
 
 # ignore Python cache
 **/__pycache__/
+
+# ignore data/ dir and all its contents
+data/

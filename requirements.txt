@@ -7,3 +7,10 @@ streamlit
 langgraph
 openai  # openrouter uses openai-compatible API
 python-dotenv  # for environment variables management
+
+# data processing
+pandas
+tqdm
+transformers
+sentence-transformers
+torch
