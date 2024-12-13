@@ -1,10 +1,13 @@
 import streamlit as st
 from src.llm import ReviewGenerator
+from src.db.db_connection import get_unique_rubrics, get_relevant_reviews
 
 
 # Initialize ReviewGenerator in session state if not exists
 if 'review_generator' not in st.session_state:
     st.session_state.review_generator = ReviewGenerator()
+    st.session_state.real_reviews = None
+    st.session_state.exact_match = None
 
 # Page configuration
 st.set_page_config(
@@ -150,11 +153,13 @@ with col1:
     )
 
     st.markdown('<p class="big-font">Рубрика:</p>', unsafe_allow_html=True)
-    category = st.text_input(
+    # Get unique rubrics from the database
+    rubrics = get_unique_rubrics()
+    category = st.selectbox(
         "Рубрика",
+        options=rubrics,
         key="category",
-        label_visibility="collapsed",
-        placeholder="Например: ресторан, кафе, магазин"
+        label_visibility="collapsed"
     )
 
 with col2:
@@ -182,25 +187,70 @@ if generate:
     if not theme or not category:
         st.error("Пожалуйста, заполните все поля!")
     else:
-        with st.spinner("Генерируем отзыв..."):
-            review, error = st.session_state.review_generator.generate_review(
-                theme=theme,
-                rating=rating,
-                category=category
+        # Get relevant reviews from DB
+        reviews, exact_match = get_relevant_reviews(category, rating)
+
+        if not reviews:
+            st.error(f"В базе данных не найдено отзывов для рубрики '{category}'")
+        elif not exact_match:
+            # Store reviews in session state
+            st.session_state.real_reviews = reviews
+            st.session_state.exact_match = exact_match
+
+            # Show warning and ask for confirmation
+            st.warning(
+                f"Для рубрики '{category}' не найдено отзывов с рейтингом {rating}. "
+                "Хотите использовать случайные отзывы из этой рубрики?"
             )
 
-        if error:
-            st.error(error)
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Да, продолжить", use_container_width=True):
+                    st.session_state.confirmed = True
+            with col2:
+                if st.button("Нет, вернуться", use_container_width=True):
+                    st.session_state.confirmed = False
+                    st.rerun()
         else:
-            st.markdown(
-                '<div class="card">'
-                '<h2>🏁 Ваш отзыв готов!</h2>',
-                unsafe_allow_html=True
-            )
-            st.text_area(
-                "Сгенерированный отзыв",
-                review,
-                height=200,
-                label_visibility="collapsed"
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.session_state.real_reviews = reviews
+            st.session_state.exact_match = exact_match
+            st.session_state.confirmed = True
+
+        if getattr(st.session_state, 'confirmed', False):
+            with st.spinner("Генерируем отзыв..."):
+                # Format reviews for prompt
+                reviews_text = "\n\n".join(
+                    f"Пример {i+1}:\n{review}" 
+                    for i, review in enumerate(st.session_state.real_reviews)
+                )
+
+                review, error = st.session_state.review_generator.generate_review(
+                    theme=theme,
+                    rating=rating,
+                    category=category,
+                    real_reviews=reviews_text
+                )
+
+            if error:
+                st.error(error)
+            else:
+                st.markdown(
+                    '<div class="card">'
+                    '<h2>🏁 Ваш отзыв готов!</h2>',
+                    unsafe_allow_html=True
+                )
+                st.text_area(
+                    "Сгенерированный отзыв",
+                    review,
+                    height=200,
+                    label_visibility="collapsed"
+                )
+
+                # Show real reviews that were used for inspiration
+                with st.expander("📚 Показать реальные отзывы, использованные для вдохновения"):
+                    for i, review in enumerate(st.session_state.real_reviews, 1):
+                        st.markdown(f"**Отзыв {i}:**")
+                        st.text(review)
+                        st.markdown("---")
+
+                st.markdown('</div>', unsafe_allow_html=True)

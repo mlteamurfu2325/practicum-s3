@@ -37,6 +37,7 @@ class ReviewState(TypedDict):
     rating: int
     category: str
     attempts: int
+    real_reviews: Optional[str]
     validation_result: Optional[Dict]
     generated_review: Optional[str]
     check_result: Optional[Dict]
@@ -47,10 +48,10 @@ def clean_json_response(content: str) -> str:
     # Remove markdown code block markers
     content = re.sub(r'```(?:json)?\n', '', content)
     content = content.replace('```', '')
-    
+
     # Remove any leading/trailing whitespace
     content = content.strip()
-    
+
     # Add missing commas between properties at any level
     def add_commas(match):
         """Add comma after the value if needed."""
@@ -61,11 +62,11 @@ def clean_json_response(content: str) -> str:
         if value.endswith('"'):
             return f'{value},{next_char}'
         return f'{value}{next_char}'
-    
+
     # Match any JSON value followed by a newline and another property
     pattern = r'(true|false|null|\d+|"[^"]*")\s*\n\s*(["{])'
     content = re.sub(pattern, add_commas, content)
-    
+
     logger.info(f"Cleaned JSON content: {content}")
     return content
 
@@ -137,7 +138,8 @@ class ReviewGenerator:
                     "content": GENERATION_PROMPT.format(
                         category=state["category"],
                         rating=state["rating"],
-                        theme=state["theme"]
+                        theme=state["theme"],
+                        real_reviews=state["real_reviews"]
                     )
                 }]
             )
@@ -238,7 +240,8 @@ class ReviewGenerator:
         self,
         theme: str,
         rating: int,
-        category: str
+        category: str,
+        real_reviews: Optional[str] = None
     ) -> Tuple[Optional[str], Optional[str]]:
         """
         Generate a review based on given parameters.
@@ -247,6 +250,7 @@ class ReviewGenerator:
             theme: Key theme of the review
             rating: Rating (1-5)
             category: Place category
+            real_reviews: Optional string containing real reviews for inspiration
 
         Returns:
             Tuple of (review text, error message if any)
@@ -260,6 +264,7 @@ class ReviewGenerator:
             "rating": rating,
             "category": category,
             "attempts": 0,
+            "real_reviews": real_reviews or "Примеры отзывов отсутствуют.",
             "validation_result": None,
             "generated_review": None,
             "check_result": None
