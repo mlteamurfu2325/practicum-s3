@@ -196,6 +196,9 @@ if generate:
             # Store reviews in session state
             st.session_state.real_reviews = reviews
             st.session_state.exact_match = exact_match
+            st.session_state.theme = theme
+            st.session_state.rating = rating
+            st.session_state.category = category
 
             # Show warning and ask for confirmation
             st.warning(
@@ -207,21 +210,17 @@ if generate:
             with col1:
                 if st.button("Да, продолжить", use_container_width=True):
                     st.session_state.confirmed = True
+                    st.rerun()
             with col2:
                 if st.button("Нет, вернуться", use_container_width=True):
                     st.session_state.confirmed = False
                     st.rerun()
         else:
-            st.session_state.real_reviews = reviews
-            st.session_state.exact_match = exact_match
-            st.session_state.confirmed = True
-
-        if getattr(st.session_state, 'confirmed', False):
+            # For exact matches, proceed with generation
             with st.spinner("Генерируем отзыв..."):
-                # Format reviews for prompt
                 reviews_text = "\n\n".join(
                     f"Пример {i+1}:\n{review}" 
-                    for i, review in enumerate(st.session_state.real_reviews)
+                    for i, review in enumerate(reviews)
                 )
 
                 review, error = st.session_state.review_generator.generate_review(
@@ -231,26 +230,65 @@ if generate:
                     real_reviews=reviews_text
                 )
 
-            if error:
-                st.error(error)
-            else:
-                st.markdown(
-                    '<div class="card">'
-                    '<h2>🏁 Ваш отзыв готов!</h2>',
-                    unsafe_allow_html=True
-                )
-                st.text_area(
-                    "Сгенерированный отзыв",
-                    review,
-                    height=200,
-                    label_visibility="collapsed"
-                )
+                if error:
+                    st.error(error)
+                else:
+                    st.markdown(
+                        '<div class="card">'
+                        '<h2>🏁 Ваш отзыв готов!</h2>',
+                        unsafe_allow_html=True
+                    )
+                    st.text_area(
+                        "Сгенерированный отзыв",
+                        review,
+                        height=200,
+                        label_visibility="collapsed"
+                    )
 
-                # Show real reviews that were used for inspiration
-                with st.expander("📚 Показать реальные отзывы, использованные для вдохновения"):
-                    for i, review in enumerate(st.session_state.real_reviews, 1):
-                        st.markdown(f"**Отзыв {i}:**")
-                        st.text(review)
-                        st.markdown("---")
+                    # Show real reviews that were used for inspiration
+                    with st.expander("📚 Показать реальные отзывы, использованные для вдохновения"):
+                        for i, review in enumerate(reviews, 1):
+                            st.markdown(f"**Отзыв {i}:**")
+                            st.text(review)
+                            st.markdown("---")
 
-                st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+# Handle confirmed state for non-exact matches
+if getattr(st.session_state, 'confirmed', False):
+    with st.spinner("Генерируем отзыв..."):
+        reviews_text = "\n\n".join(
+            f"Пример {i+1}:\n{review}" 
+            for i, review in enumerate(st.session_state.real_reviews)
+        )
+
+        review, error = st.session_state.review_generator.generate_review(
+            theme=st.session_state.theme,
+            rating=st.session_state.rating,
+            category=st.session_state.category,
+            real_reviews=reviews_text
+        )
+
+        if error:
+            st.error(error)
+        else:
+            st.markdown(
+                '<div class="card">'
+                '<h2>🏁 Ваш отзыв готов!</h2>',
+                unsafe_allow_html=True
+            )
+            st.text_area(
+                "Сгенерированный отзыв",
+                review,
+                height=200,
+                label_visibility="collapsed"
+            )
+
+            # Show real reviews that were used for inspiration
+            with st.expander("📚 Показать реальные отзывы, использованные для вдохновения"):
+                for i, review in enumerate(st.session_state.real_reviews, 1):
+                    st.markdown(f"**Отзыв {i}:**")
+                    st.text(review)
+                    st.markdown("---")
+
+            st.markdown('</div>', unsafe_allow_html=True)
