@@ -3,9 +3,13 @@ from src.llm import ReviewGenerator
 from src.db.db_connection import get_unique_rubrics, get_relevant_reviews
 
 
-# Initialize ReviewGenerator in session state if not exists
+# Initialize session state variables
 if 'review_generator' not in st.session_state:
     st.session_state.review_generator = ReviewGenerator()
+if 'confirmed_generation' not in st.session_state:
+    st.session_state.confirmed_generation = False
+if 'pending_generation' not in st.session_state:
+    st.session_state.pending_generation = {}
 
 def generate_review(theme, rating, category, reviews):
     """Helper function to generate review with spinner"""
@@ -218,15 +222,25 @@ st.markdown("</div>", unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Review generation section
-if generate:
+if generate or st.session_state.confirmed_generation:
     if not theme or not category:
         st.error("Пожалуйста, заполните все поля!")
     else:
+        # Store current generation parameters
+        if generate:
+            st.session_state.pending_generation = {
+                'theme': theme,
+                'rating': rating,
+                'category': category
+            }
+            st.session_state.confirmed_generation = False
+
         reviews, exact_match = get_relevant_reviews(category, rating)
 
         if not reviews:
             st.error(f"В базе данных не найдено отзывов для рубрики '{category}'")
-        elif not exact_match:
+            st.session_state.confirmed_generation = False
+        elif not exact_match and not st.session_state.confirmed_generation:
             # Show warning and ask for confirmation
             st.warning(
                 f"Для рубрики '{category}' не найдено отзывов с рейтингом {rating}. "
@@ -236,9 +250,13 @@ if generate:
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("Да, продолжить", use_container_width=True, key="accept"):
-                    generate_review(theme, rating, category, reviews)
+                    st.session_state.confirmed_generation = True
+                    st.experimental_rerun()
             with col2:
-                st.button("Нет, вернуться", use_container_width=True, key="reject")
+                if st.button("Нет, вернуться", use_container_width=True, key="reject"):
+                    st.session_state.confirmed_generation = False
         else:
-            # For exact matches, proceed with generation
+            # For exact matches or after confirmation, proceed with generation
             generate_review(theme, rating, category, reviews)
+            # Reset confirmation state after generation
+            st.session_state.confirmed_generation = False
