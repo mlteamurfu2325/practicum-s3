@@ -8,6 +8,9 @@ if 'review_generator' not in st.session_state:
     st.session_state.review_generator = ReviewGenerator()
     st.session_state.real_reviews = None
     st.session_state.exact_match = None
+    st.session_state.confirmed_theme = None
+    st.session_state.confirmed_rating = None
+    st.session_state.confirmed_category = None
 
 # Page configuration
 st.set_page_config(
@@ -193,12 +196,12 @@ if generate:
         if not reviews:
             st.error(f"В базе данных не найдено отзывов для рубрики '{category}'")
         elif not exact_match:
-            # Store reviews in session state
+            # Store reviews and parameters in session state
             st.session_state.real_reviews = reviews
             st.session_state.exact_match = exact_match
-            st.session_state.theme = theme
-            st.session_state.rating = rating
-            st.session_state.category = category
+            st.session_state.confirmed_theme = theme
+            st.session_state.confirmed_rating = rating
+            st.session_state.confirmed_category = category
 
             # Show warning and ask for confirmation
             st.warning(
@@ -263,9 +266,9 @@ if getattr(st.session_state, 'confirmed', False):
         )
 
         review, error = st.session_state.review_generator.generate_review(
-            theme=st.session_state.theme,
-            rating=st.session_state.rating,
-            category=st.session_state.category,
+            theme=st.session_state.confirmed_theme,
+            rating=st.session_state.confirmed_rating,
+            category=st.session_state.confirmed_category,
             real_reviews=reviews_text
         )
 
@@ -292,3 +295,6 @@ if getattr(st.session_state, 'confirmed', False):
                     st.markdown("---")
 
             st.markdown('</div>', unsafe_allow_html=True)
+
+            # Clear confirmed state after generation
+            st.session_state.confirmed = False
