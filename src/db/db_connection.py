@@ -25,15 +25,22 @@ def get_unique_rubrics():
 def get_relevant_reviews(rubric: str, rating: int, limit: int = 10):
     engine = get_db_connection()
     with engine.connect() as conn:
-        # Try exact rating match first
+        # Try exact rating match first using subquery
         exact_match_query = text("""
-            SELECT DISTINCT r.text, r.rating
-            FROM yareviews r
-            JOIN review_rubrics rr ON r.review_id = rr.review_id
-            JOIN rubrics rb ON rr.rubric_id = rb.rubric_id
-            WHERE rb.rubric_name = :rubric
-            AND r.rating = :rating
-            ORDER BY RANDOM()
+            WITH distinct_reviews AS (
+                SELECT DISTINCT ON (r.text) r.text, r.rating
+                FROM yareviews r
+                JOIN review_rubrics rr ON r.review_id = rr.review_id
+                JOIN rubrics rb ON rr.rubric_id = rb.rubric_id
+                WHERE rb.rubric_name = :rubric
+                AND r.rating = :rating
+            )
+            SELECT text, rating
+            FROM (
+                SELECT text, rating, random() as rand
+                FROM distinct_reviews
+            ) t
+            ORDER BY rand
             LIMIT :limit
         """)
 
@@ -48,12 +55,19 @@ def get_relevant_reviews(rubric: str, rating: int, limit: int = 10):
 
         # If no exact matches, get random reviews from same rubric
         random_query = text("""
-            SELECT DISTINCT r.text, r.rating
-            FROM yareviews r
-            JOIN review_rubrics rr ON r.review_id = rr.review_id
-            JOIN rubrics rb ON rr.rubric_id = rb.rubric_id
-            WHERE rb.rubric_name = :rubric
-            ORDER BY RANDOM()
+            WITH distinct_reviews AS (
+                SELECT DISTINCT ON (r.text) r.text, r.rating
+                FROM yareviews r
+                JOIN review_rubrics rr ON r.review_id = rr.review_id
+                JOIN rubrics rb ON rr.rubric_id = rb.rubric_id
+                WHERE rb.rubric_name = :rubric
+            )
+            SELECT text, rating
+            FROM (
+                SELECT text, rating, random() as rand
+                FROM distinct_reviews
+            ) t
+            ORDER BY rand
             LIMIT :limit
         """)
 
