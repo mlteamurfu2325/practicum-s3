@@ -14,3 +14,8 @@ tqdm
 transformers
 sentence-transformers
 torch
+
+# db
+pgvector
+sqlalchemy
+psycopg2-binary
