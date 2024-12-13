@@ -18,17 +18,15 @@ DB_USER = 'postgres'
 DB_PASSWORD = 'password'
 
 # Connection string
-connection_string = (
-    f"postgresql://{DB_USER}:{DB_PASSWORD}"
-    f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
+connection_string = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Create an engine and connect to the database
 engine = create_engine(connection_string)
 conn = engine.connect()
 
-# Enable pgvector extension
-conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+# Enable pgvector extension - must be done before creating tables
+conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+conn.execute(text('COMMIT'))
 
 # Read the Parquet file into a DataFrame
 df = pd.read_parquet('data/geo-reviews-enriched.parquet')
@@ -82,22 +80,21 @@ review_rubrics = Table(
     Index('idx_review_rubrics_rubric_id', 'rubric_id')
 )
 
+# Drop existing tables if they exist
+metadata.drop_all(engine)
+
 # Create all tables
 metadata.create_all(engine)
 
 # Create vector similarity search index
 with engine.begin() as connection:
-    index_exists = connection.execute(
-        text("SELECT to_regclass('public.yareviews_embeddings_idx');")
-    ).scalar()
-    if not index_exists:
-        connection.execute(text(
-            "CREATE INDEX yareviews_embeddings_idx "
-            "ON yareviews "
-            "USING ivfflat (embeddings vector_l2_ops) "
-            "WITH (lists = 100);"
-        ))
-        connection.execute(text("ANALYZE yareviews;"))
+    connection.execute(text(
+        "CREATE INDEX yareviews_embeddings_idx "
+        "ON yareviews "
+        "USING ivfflat (embeddings vector_l2_ops) "
+        "WITH (lists = 100);"
+    ))
+    connection.execute(text("ANALYZE yareviews;"))
 
 # Extract unique rubrics from the dataset
 unique_rubrics = sorted(set(
@@ -111,8 +108,10 @@ with engine.begin() as connection:
     # Insert rubrics
     for rubric in unique_rubrics:
         connection.execute(
-            text("INSERT INTO rubrics (rubric_name) "
-                 "VALUES (:rubric) ON CONFLICT DO NOTHING"),
+            text(
+                "INSERT INTO rubrics (rubric_name) "
+                "VALUES (:rubric) ON CONFLICT DO NOTHING"
+            ),
             {"rubric": rubric}
         )
 
