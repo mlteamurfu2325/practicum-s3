@@ -2,17 +2,17 @@
 
 # Function to print section headers
 print_header() {
-    echo "===================================="
+    echo -e "\n\n===================================="
     echo "$1"
-    echo "===================================="
+    echo "====================================\n"
 }
 
 # Function to check command status
 check_status() {
     if [ $? -eq 0 ]; then
-        echo "✓ $1 completed successfully"
+        echo -e "✓ $1 completed successfully\n"
     else
-        echo "✗ Error: $1 failed"
+        echo -e "✗ Error: $1 failed\n"
         exit 1
     fi
 }
@@ -24,7 +24,8 @@ prompt_secret() {
     local secret_value
 
     # Prompt for the secret
-    echo -n "$secret_name [default: $default_value]: "
+    echo -e "\n$secret_name"
+    echo -n "[default: $default_value]: "
     read -s secret_value
     echo  # New line after hidden input
     
@@ -40,10 +41,10 @@ prompt_secret() {
 check_python_version() {
     python3 -c "import sys; exit(0) if sys.version_info >= (3, 8) else exit(1)" 2>/dev/null
     if [ $? -ne 0 ]; then
-        echo "✗ Error: Python 3.8 or higher is required"
+        echo -e "✗ Error: Python 3.8 or higher is required\n"
         exit 1
     fi
-    echo "✓ Python version check passed"
+    echo -e "✓ Python version check passed\n"
 }
 
 # Function to check file md5sum
@@ -76,7 +77,6 @@ fi
 source .venv/bin/activate
 check_status "Virtual environment activation"
 
-# Install/upgrade pip
 print_header "Upgrading pip and installing dependencies"
 python -m pip install --upgrade pip
 check_status "Pip upgrade"
@@ -86,10 +86,19 @@ echo "Installing dependencies..."
 pip install -r requirements.txt
 check_status "Dependencies installation"
 
+print_header "Setting up security configuration"
+
+# Create logs directory
+echo "Creating logs directory..."
+mkdir -p logs
+chmod 750 logs
+check_status "Logs directory setup"
+
 # Create secrets directory
-print_header "Setting up secrets"
+echo "Setting up secrets directory..."
 mkdir -p secrets
 chmod 700 secrets
+check_status "Secrets directory setup"
 
 # Generate random password for database if not exists
 if [ ! -f "secrets/db_password.txt" ]; then
@@ -99,11 +108,10 @@ if [ ! -f "secrets/db_password.txt" ]; then
     check_status "Database password generation"
 fi
 
-# Create .env file if it doesn't exist
 print_header "Environment setup"
 if [ ! -f ".env" ]; then
     echo "Setting up environment variables..."
-    echo "Please provide the following configuration values:"
+    echo -e "Please provide the following configuration values:\n"
     
     # Prompt for OpenRouter API key
     OPENROUTER_KEY=$(prompt_secret "OpenRouter API Key" "your_api_key_here")
@@ -114,6 +122,9 @@ if [ ! -f ".env" ]; then
     DB_NAME=$(prompt_secret "Database Name" "postgres")
     DB_USER=$(prompt_secret "Database User" "postgres")
     DB_PASSWORD=$(cat secrets/db_password.txt)
+    
+    # Security settings
+    MAX_REQUESTS=$(prompt_secret "Max Requests per Hour" "100")
     
     # Create .env file
     cat > .env << EOL
@@ -126,6 +137,9 @@ DB_PORT=${DB_PORT}
 DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
+
+# Security Settings
+MAX_REQUESTS_PER_HOUR=${MAX_REQUESTS}
 EOL
     chmod 600 .env
     check_status ".env file creation"
@@ -141,17 +155,17 @@ required_dirs=(
 
 for dir in "${required_dirs[@]}"; do
     if [ ! -d "$dir" ]; then
-        echo "✗ Error: Required directory $dir is missing"
+        echo -e "✗ Error: Required directory $dir is missing\n"
         exit 1
     fi
 done
-echo "✓ Project structure verification passed"
+echo -e "✓ Project structure verification passed\n"
 
 print_header "Checking data files"
 
 # Check enriched parquet file
 if [ ! -f "data/geo-reviews-enriched.parquet" ]; then
-    echo "Need to generate Parquet files for Reviews and Enrich it with embeddings for review texts"
+    echo -e "Need to generate Parquet files for Reviews and Enrich it with embeddings for review texts\n"
     
     # Check if raw TSKV file exists with correct md5sum
     if ! check_md5sum "data/geo-reviews-dataset-2023.tskv" "857fe8ae8af5f5165da3e1674e6f588a"; then
@@ -160,7 +174,7 @@ if [ ! -f "data/geo-reviews-enriched.parquet" ]; then
         wget -O data/geo-reviews-dataset-2023.tskv https://github.com/yandex/geo-reviews-dataset-2023/raw/refs/heads/master/geo-reviews-dataset-2023.tskv
         
         if ! check_md5sum "data/geo-reviews-dataset-2023.tskv" "857fe8ae8af5f5165da3e1674e6f588a"; then
-            echo "✗ Error: Downloaded file has incorrect md5sum"
+            echo -e "✗ Error: Downloaded file has incorrect md5sum\n"
             exit 1
         fi
     fi
@@ -176,31 +190,46 @@ if [ ! -f "data/geo-reviews-enriched.parquet" ]; then
     check_status "Embeddings enrichment"
 fi
 
+print_header "Security Checklist"
+echo "Please verify the following:"
+echo "1. .env file exists and has correct permissions (600)"
+echo "2. secrets/db_password.txt exists and has correct permissions (600)"
+echo "3. secrets/ directory has correct permissions (700)"
+echo "4. logs/ directory has correct permissions (750)"
+echo -e "\nFile permissions:"
+ls -la .env 2>/dev/null || echo "❌ .env file missing"
+ls -la secrets/db_password.txt 2>/dev/null || echo "❌ db_password.txt missing"
+ls -ld secrets/ 2>/dev/null || echo "❌ secrets directory missing"
+ls -ld logs/ 2>/dev/null || echo "❌ logs directory missing"
+echo -e "\n"
+
 print_header "Setup complete!"
-echo "To complete the setup:"
+echo -e "To complete the setup:\n"
 echo "1. Review your .env file and secrets/db_password.txt"
-echo "2. Run: streamlit run app.py"
-echo ""
-echo "Security Notes:"
+echo "2. Ensure all security permissions are correct (see above)"
+echo -e "3. Run: streamlit run app.py\n"
+
+echo -e "Security Notes:\n"
 echo "1. Keep your .env and secrets/ directory secure"
 echo "2. Never commit secrets to version control"
 echo "3. Regularly rotate passwords and API keys"
-echo ""
-echo "Development workflow:"
+echo "4. Monitor logs/ directory for suspicious activity"
+echo -e "5. Review rate limiting settings in .env\n"
+
+echo -e "Development workflow:\n"
 echo "1. Create issue on GitHub"
 echo "2. Create branch: issue-<number>/<category>/<description>"
 echo "3. Make changes following conventional commits"
 echo "4. Create pull request"
 echo "5. Get code review"
-echo "6. Merge to main"
-echo ""
-echo "Commit message format:"
+echo -e "6. Merge to main\n"
+
+echo -e "Commit message format:\n"
 echo "<type>[area]: <description>"
-echo ""
-echo "Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build, revert"
-echo ""
-echo "LLM Integration Notes:"
+echo -e "\nTypes: feat, fix, docs, style, refactor, test, chore, perf, ci, build, revert\n"
+
+echo -e "LLM Integration Notes:\n"
 echo "- Model: google/gemini-flash-1.5 via OpenRouter API"
 echo "- Review generation workflow: validation → generation → quality check"
 echo "- Automatic retries on failure (max 3 attempts)"
-echo "- 15-second timeout per generation attempt"
+echo -e "- 15-second timeout per generation attempt\n"
