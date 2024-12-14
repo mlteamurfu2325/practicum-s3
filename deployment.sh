@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Check if script is run with sudo
+if [ "$EUID" -ne 0 ]; then 
+    echo "Please run this script with sudo"
+    exit 1
+fi
+
 # Store the full script path
 SCRIPT_PATH=$(readlink -f "$0")
 
@@ -40,32 +46,24 @@ setup_docker() {
     if ! command -v docker &> /dev/null; then
         echo "Docker not found. Installing Docker..."
         # Add Docker's official GPG key
-        sudo apt-get update
-        sudo apt-get install -y ca-certificates curl gnupg
-        sudo install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-        sudo chmod a+r /etc/apt/keyrings/docker.gpg
+        apt-get update
+        apt-get install -y ca-certificates curl gnupg
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
 
         # Add the repository to Apt sources
         echo \
           "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
           "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-          sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          tee /etc/apt/sources.list.d/docker.list > /dev/null
 
         # Install Docker packages
-        sudo apt-get update
-        sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
         check_status "Docker installation"
     else
         echo "✓ Docker is already installed"
-    fi
-
-    # Add current user to docker group if not already added
-    if ! groups | grep -q docker; then
-        sudo usermod -aG docker $USER
-        echo "✓ Added user to docker group. Please log out and back in for this to take effect."
-        # Create a new shell with the docker group added to avoid requiring logout
-        exec sg docker -c "$SCRIPT_PATH"
     fi
 }
 
@@ -73,8 +71,8 @@ setup_docker() {
 setup_docker_compose() {
     if ! command -v docker compose &> /dev/null; then
         echo "Docker Compose not found. Installing Docker Compose..."
-        sudo apt-get update
-        sudo apt-get install -y docker-compose-plugin
+        apt-get update
+        apt-get install -y docker-compose-plugin
         check_status "Docker Compose installation"
     else
         echo "✓ Docker Compose is already installed"
@@ -84,6 +82,15 @@ setup_docker_compose() {
 # Function to start Docker containers
 start_docker_containers() {
     echo "Starting Docker containers..."
+    
+    # Create docker_db_password file if it doesn't exist
+    if [ ! -f "docker/docker_db_password" ]; then
+        echo "Generating Docker database password..."
+        openssl rand -base64 32 > docker/docker_db_password
+        chmod 600 docker/docker_db_password
+        check_status "Docker database password generation"
+    fi
+    
     cd docker/
     docker compose up -d
     check_status "Starting Docker containers"
@@ -146,7 +153,7 @@ print_header "Installing MEGA CMD"
 wget "https://mega.nz/linux/repo/xUbuntu_${ubuntu_version}/amd64/megacmd-xUbuntu_${ubuntu_version}_amd64.deb"
 check_status "MEGA CMD package download"
 
-sudo apt install "./megacmd-xUbuntu_${ubuntu_version}_amd64.deb"
+apt install -y "./megacmd-xUbuntu_${ubuntu_version}_amd64.deb"
 check_status "MEGA CMD installation"
 
 # Clean up the downloaded package
