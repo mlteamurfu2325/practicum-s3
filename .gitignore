@@ -18,3 +18,18 @@
 
 # ignore data/ dir and all its contents
 data/
+
+# Security-related
+secrets/
+.env
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.keystore
+*.jks
+
+# Logs
+logs/
+*.log
