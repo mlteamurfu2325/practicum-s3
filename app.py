@@ -5,7 +5,11 @@ import time
 import logging
 from datetime import datetime
 import os
+from dotenv import load_dotenv
 
+
+# Load environment variables
+load_dotenv()
 
 # Set up logging
 os.makedirs('logs', exist_ok=True)
@@ -48,6 +52,7 @@ class RateLimiter:
 # Initialize rate limiter in session state
 if 'rate_limiter' not in st.session_state:
     max_requests = int(os.getenv('MAX_REQUESTS_PER_HOUR', '100'))
+    timeout = int(os.getenv('TIMEOUT_SECONDS', '15'))
     st.session_state.rate_limiter = RateLimiter(
         max_requests=max_requests,
         window_seconds=3600
@@ -321,12 +326,11 @@ if generate:
             )
         else:
             if not exact_match:
-                st.info(
+                msg = (
                     "Для рубрики '{}' не найдено отзывов с рейтингом {}. "
-                    "Будут использованы случайные отзывы из этой рубрики.".format(
-                        category, rating
-                    )
-                )
+                    "Будут использованы случайные отзывы из этой рубрики."
+                ).format(category, rating)
+                st.info(msg)
 
             # Proceed with generation
             generate_review(theme, rating, category, reviews)
