@@ -24,14 +24,14 @@ services:
       - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
       - POSTGRES_DB=postgres
       - max_connections=100
-      - shared_buffers=256MB
+      - shared_buffers=1024MB
     secrets:
       - db_password
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1G
+          cpus: '2'
+          memory: 4G
     user: postgres:postgres
     security_opt:
       - no-new-privileges:true
