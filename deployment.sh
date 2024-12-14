@@ -17,6 +17,25 @@ check_status() {
     fi
 }
 
+# Function to prompt for secret
+prompt_secret() {
+    local secret_name=$1
+    local default_value=$2
+    local secret_value
+
+    # Prompt for the secret
+    echo -n "$secret_name [default: $default_value]: "
+    read -s secret_value
+    echo  # New line after hidden input
+    
+    # Use default if no input provided
+    if [ -z "$secret_value" ]; then
+        secret_value=$default_value
+    fi
+    
+    echo $secret_value
+}
+
 # Function to check Python version
 check_python_version() {
     python3 -c "import sys; exit(0) if sys.version_info >= (3, 8) else exit(1)" 2>/dev/null
@@ -67,16 +86,48 @@ echo "Installing dependencies..."
 pip install -r requirements.txt
 check_status "Dependencies installation"
 
+# Create secrets directory
+print_header "Setting up secrets"
+mkdir -p secrets
+chmod 700 secrets
+
+# Generate random password for database if not exists
+if [ ! -f "secrets/db_password.txt" ]; then
+    echo "Generating secure database password..."
+    openssl rand -base64 32 > secrets/db_password.txt
+    chmod 600 secrets/db_password.txt
+    check_status "Database password generation"
+fi
+
 # Create .env file if it doesn't exist
 print_header "Environment setup"
 if [ ! -f ".env" ]; then
-    echo "Creating .env file..."
+    echo "Setting up environment variables..."
+    echo "Please provide the following configuration values:"
+    
+    # Prompt for OpenRouter API key
+    OPENROUTER_KEY=$(prompt_secret "OpenRouter API Key" "your_api_key_here")
+    
+    # Database configuration
+    DB_HOST=$(prompt_secret "Database Host" "localhost")
+    DB_PORT=$(prompt_secret "Database Port" "5432")
+    DB_NAME=$(prompt_secret "Database Name" "postgres")
+    DB_USER=$(prompt_secret "Database User" "postgres")
+    DB_PASSWORD=$(cat secrets/db_password.txt)
+    
+    # Create .env file
     cat > .env << EOL
 # OpenRouter API Configuration
-OPENROUTER_API_KEY=your_api_key_here
+OPENROUTER_API_KEY=${OPENROUTER_KEY}
+
+# Database Configuration
+DB_HOST=${DB_HOST}
+DB_PORT=${DB_PORT}
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASSWORD=${DB_PASSWORD}
 EOL
     chmod 600 .env
-    echo "Please update .env with your actual OpenRouter API key"
     check_status ".env file creation"
 fi
 
@@ -127,8 +178,13 @@ fi
 
 print_header "Setup complete!"
 echo "To complete the setup:"
-echo "1. Update .env with your OpenRouter API key from https://openrouter.ai/"
+echo "1. Review your .env file and secrets/db_password.txt"
 echo "2. Run: streamlit run app.py"
+echo ""
+echo "Security Notes:"
+echo "1. Keep your .env and secrets/ directory secure"
+echo "2. Never commit secrets to version control"
+echo "3. Regularly rotate passwords and API keys"
 echo ""
 echo "Development workflow:"
 echo "1. Create issue on GitHub"
