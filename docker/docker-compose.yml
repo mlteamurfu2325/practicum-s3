@@ -20,11 +20,7 @@ services:
       - "127.0.0.1:5432:5432"  # Only allow local connections
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=postgres
-      - max_connections=100
-      - shared_buffers=1024MB
+    env_file: ../.env
     deploy:
       resources:
         limits:
@@ -38,7 +34,6 @@ services:
       - /tmp
       - /var/run/postgresql
     restart: unless-stopped
-    env_file: ../.env
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
