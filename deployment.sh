@@ -1,10 +1,18 @@
 #!/bin/bash
 
+# Store the full script path
+SCRIPT_PATH=$(readlink -f "$0")
+
+# Set up logging
+exec 1> >(tee "deployment.log") 2>&1
+echo "Deployment started at $(date)"
+echo "----------------------------------------"
+
 # Function to print section headers
 print_header() {
-    echo -e "\n\n===================================="
+    echo -e "\n===================================="
     echo "$1"
-    echo "====================================\n"
+    echo "===================================="
 }
 
 # Function to check command status
@@ -55,9 +63,9 @@ setup_docker() {
     # Add current user to docker group if not already added
     if ! groups | grep -q docker; then
         sudo usermod -aG docker $USER
-        echo "✓ Added user to docker group. In case of errors log out and back in for this to take effect."
+        echo "✓ Added user to docker group. Please log out and back in for this to take effect."
         # Create a new shell with the docker group added to avoid requiring logout
-        exec sg docker -c "$0"
+        exec sg docker -c "$SCRIPT_PATH"
     fi
 }
 
@@ -84,7 +92,7 @@ start_docker_containers() {
     # Wait for the database to be ready
     echo "Waiting for database to be ready..."
     sleep 10  # Initial wait
-    max_attempts=3
+    max_attempts=30
     attempt=1
     while ! docker exec $(docker ps -qf "name=timescaledb") pg_isready -U postgres > /dev/null 2>&1; do
         if [ $attempt -eq $max_attempts ]; then
@@ -92,7 +100,7 @@ start_docker_containers() {
             exit 1
         fi
         echo "Waiting for database to be ready... (attempt $attempt/$max_attempts)"
-        sleep 10
+        sleep 2
         ((attempt++))
     done
     echo "✓ Database is ready"
@@ -331,3 +339,7 @@ echo -e "To complete the setup:\n"
 echo "1. Review your .env file and secrets/db_password.txt"
 echo "2. Ensure all security permissions are correct (see above)"
 echo -e "3. Run: streamlit run app.py\n"
+
+echo -e "\nDeployment finished at $(date)"
+echo "----------------------------------------"
+echo "Full deployment log has been saved to deployment.log"
