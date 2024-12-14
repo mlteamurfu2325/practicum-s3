@@ -82,7 +82,6 @@ setup_docker_compose() {
 # Function to start Docker containers
 start_docker_containers() {
     echo "Starting Docker containers..."
-    
     cd docker/
     docker compose up -d
     check_status "Starting Docker containers"
@@ -197,56 +196,16 @@ fi
 print_header "Checking system requirements"
 check_python_version
 
-print_header "Setting up security configuration"
-
-# Create logs directory
-echo "Creating logs directory..."
+print_header "Creating logs directory"
 mkdir -p logs
 chmod 750 logs
 check_status "Logs directory setup"
 
-# Create secrets directory
-echo "Setting up secrets directory..."
-mkdir -p secrets
-chmod 700 secrets
-check_status "Secrets directory setup"
-
-# Generate random password for database if not exists
-if [ ! -f "secrets/db_password.txt" ]; then
-    echo "Generating secure database password..."
-    openssl rand -base64 32 > secrets/db_password.txt
-    chmod 600 secrets/db_password.txt
-    check_status "Database password generation"
-fi
-
 print_header "Setting up Docker environment"
 setup_docker
 setup_docker_compose
-start_docker_containers
 
-print_header "Setting up development environment"
-
-# Create virtual environment if it doesn't exist
-if [ ! -d ".venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m virtualenv .venv
-    check_status "Virtual environment creation"
-fi
-
-# Activate virtual environment
-source .venv/bin/activate
-check_status "Virtual environment activation"
-
-print_header "Upgrading pip and installing dependencies"
-python -m pip install --upgrade pip
-check_status "Pip upgrade"
-
-# Install requirements
-echo "Installing dependencies..."
-pip install -r requirements.txt
-check_status "Dependencies installation"
-
-print_header "Environment setup"
+print_header "Setting up environment variables"
 if [ ! -f ".env" ]; then
     echo "Setting up environment variables..."
     echo -e "Please provide the following configuration values:\n"
@@ -268,20 +227,21 @@ if [ ! -f ".env" ]; then
     read MAX_REQUESTS
     MAX_REQUESTS=${MAX_REQUESTS:-100}
     
-    # Get database password
-    DB_PASSWORD=$(cat secrets/db_password.txt)
+    # Generate database password
+    DB_PASSWORD=$(openssl rand -base64 32)
     
-    # Create .env file with fixed database configuration
+    # Create .env file with configuration
     cat > .env << EOL
 # OpenRouter API Configuration
 OPENROUTER_API_KEY=${OPENROUTER_KEY}
 
-# Database Configuration (using TimescaleDB defaults)
+# Database Configuration
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=postgres
 DB_USER=postgres
 DB_PASSWORD=${DB_PASSWORD}
+POSTGRES_PASSWORD=${DB_PASSWORD}
 
 # Security Settings
 MAX_REQUESTS_PER_HOUR=${MAX_REQUESTS}
@@ -290,10 +250,34 @@ EOL
     check_status ".env file creation"
     
     echo -e "\nDatabase Configuration Notes:"
-    echo "- Using default TimescaleDB user 'postgres' as recommended"
-    echo "- Database password auto-generated in secrets/db_password.txt"
+    echo "- Using default TimescaleDB user 'postgres'"
+    echo "- Database password auto-generated and stored in .env"
     echo "- Database runs in Docker container on localhost:5432"
 fi
+
+print_header "Starting Docker containers"
+start_docker_containers
+
+print_header "Setting up development environment"
+# Create virtual environment if it doesn't exist
+if [ ! -d ".venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m virtualenv .venv
+    check_status "Virtual environment creation"
+fi
+
+# Activate virtual environment
+source .venv/bin/activate
+check_status "Virtual environment activation"
+
+print_header "Upgrading pip and installing dependencies"
+python -m pip install --upgrade pip
+check_status "Pip upgrade"
+
+# Install requirements
+echo "Installing dependencies..."
+pip install -r requirements.txt
+check_status "Dependencies installation"
 
 print_header "Database Import"
 echo "Importing reviews into PostgreSQL database..."
@@ -308,7 +292,6 @@ required_dirs=(
     "docs"
     "data"
     "logs"
-    "secrets"
     "docker"
 )
 
@@ -323,19 +306,15 @@ echo -e "✓ Project structure verification passed\n"
 print_header "Security Checklist"
 echo "Please verify the following:"
 echo "1. .env file exists and has correct permissions (600)"
-echo "2. secrets/db_password.txt exists and has correct permissions (600)"
-echo "3. secrets/ directory has correct permissions (700)"
-echo "4. logs/ directory has correct permissions (750)"
+echo "2. logs/ directory has correct permissions (750)"
 echo -e "\nFile permissions:"
 ls -la .env 2>/dev/null || echo "❌ .env file missing"
-ls -la secrets/db_password.txt 2>/dev/null || echo "❌ db_password.txt missing"
-ls -ld secrets/ 2>/dev/null || echo "❌ secrets directory missing"
 ls -ld logs/ 2>/dev/null || echo "❌ logs directory missing"
 echo -e "\n"
 
 print_header "Setup complete!"
 echo -e "To complete the setup:\n"
-echo "1. Review your .env file and secrets/db_password.txt"
+echo "1. Review your .env file"
 echo "2. Ensure all security permissions are correct (see above)"
 echo -e "3. Run: streamlit run app.py\n"
 

@@ -21,14 +21,10 @@ services:
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=postgres
       - max_connections=100
       - shared_buffers=1024MB
-    secrets:
-      - source: db_password
-        target: db_password
-        mode: 0400
     deploy:
       resources:
         limits:
@@ -42,12 +38,9 @@ services:
       - /tmp
       - /var/run/postgresql
     restart: unless-stopped
+    env_file: ../.env
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-secrets:
-  db_password:
-    file: ../secrets/db_password.txt
