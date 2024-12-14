@@ -83,14 +83,6 @@ setup_docker_compose() {
 start_docker_containers() {
     echo "Starting Docker containers..."
     
-    # Create docker_db_password file if it doesn't exist
-    if [ ! -f "docker/docker_db_password" ]; then
-        echo "Generating Docker database password..."
-        openssl rand -base64 32 > docker/docker_db_password
-        chmod 600 docker/docker_db_password
-        check_status "Docker database password generation"
-    fi
-    
     cd docker/
     docker compose up -d
     check_status "Starting Docker containers"
@@ -205,6 +197,28 @@ fi
 print_header "Checking system requirements"
 check_python_version
 
+print_header "Setting up security configuration"
+
+# Create logs directory
+echo "Creating logs directory..."
+mkdir -p logs
+chmod 750 logs
+check_status "Logs directory setup"
+
+# Create secrets directory
+echo "Setting up secrets directory..."
+mkdir -p secrets
+chmod 700 secrets
+check_status "Secrets directory setup"
+
+# Generate random password for database if not exists
+if [ ! -f "secrets/db_password.txt" ]; then
+    echo "Generating secure database password..."
+    openssl rand -base64 32 > secrets/db_password.txt
+    chmod 600 secrets/db_password.txt
+    check_status "Database password generation"
+fi
+
 print_header "Setting up Docker environment"
 setup_docker
 setup_docker_compose
@@ -231,28 +245,6 @@ check_status "Pip upgrade"
 echo "Installing dependencies..."
 pip install -r requirements.txt
 check_status "Dependencies installation"
-
-print_header "Setting up security configuration"
-
-# Create logs directory
-echo "Creating logs directory..."
-mkdir -p logs
-chmod 750 logs
-check_status "Logs directory setup"
-
-# Create secrets directory
-echo "Setting up secrets directory..."
-mkdir -p secrets
-chmod 700 secrets
-check_status "Secrets directory setup"
-
-# Generate random password for database if not exists
-if [ ! -f "secrets/db_password.txt" ]; then
-    echo "Generating secure database password..."
-    openssl rand -base64 32 > secrets/db_password.txt
-    chmod 600 secrets/db_password.txt
-    check_status "Database password generation"
-fi
 
 print_header "Environment setup"
 if [ ! -f ".env" ]; then
