@@ -1,17 +1,38 @@
 from sqlalchemy import create_engine, text
 import streamlit as st
+import os
+from dotenv import load_dotenv
+
+
+# Load environment variables
+load_dotenv()
 
 
 def get_db_connection():
-    DB_HOST = 'localhost'
-    DB_PORT = '5432'
-    DB_NAME = 'postgres'
-    DB_USER = 'postgres'
-    DB_PASSWORD = 'password'
-
-    connection_string = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    engine = create_engine(connection_string)
+    DB_HOST = os.getenv('DB_HOST', 'localhost')
+    DB_PORT = os.getenv('DB_PORT', '5432')
+    DB_NAME = os.getenv('DB_NAME', 'postgres')
+    DB_USER = os.getenv('DB_USER', 'postgres')
+    DB_PASSWORD = os.getenv('DB_PASSWORD')
+    
+    if not DB_PASSWORD:
+        raise ValueError(
+            "Database password not configured. Please check your .env file."
+        )
+    
+    connection_string = (
+        f"postgresql://{DB_USER}:{DB_PASSWORD}"
+        f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    )
+    engine = create_engine(
+        connection_string,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=1800
+    )
     return engine
+
 
 @st.cache_data(ttl=360000)
 def get_unique_rubrics():
@@ -21,6 +42,7 @@ def get_unique_rubrics():
             text("SELECT rubric_name FROM rubrics ORDER BY rubric_name")
         )
         return [row[0] for row in result]
+
 
 def get_relevant_reviews(rubric: str, rating: int, limit: int = 10):
     engine = get_db_connection()
