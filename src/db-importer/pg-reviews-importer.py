@@ -8,17 +8,30 @@ from pgvector.sqlalchemy import Vector
 from tqdm import tqdm
 import ast
 from datetime import datetime
+import os
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
 
-# Database connection parameters
-DB_HOST = 'localhost'
-DB_PORT = '5432'
-DB_NAME = 'postgres'
-DB_USER = 'postgres'
-DB_PASSWORD = 'password'
+# Database connection parameters from environment
+DB_HOST = os.getenv('DB_HOST', 'localhost')
+DB_PORT = os.getenv('DB_PORT', '5432')
+DB_NAME = os.getenv('DB_NAME', 'postgres')
+DB_USER = os.getenv('DB_USER', 'postgres')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+
+if not DB_PASSWORD:
+    raise ValueError(
+        "Database password not configured. "
+        "Please check your .env file."
+    )
 
 # Connection string
-connection_string = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+connection_string = (
+    f"postgresql://{DB_USER}:{DB_PASSWORD}"
+    f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
 # Create an engine and connect to the database
 engine = create_engine(connection_string)
@@ -144,8 +157,11 @@ total_records = len(reviews_data)
 
 print("Inserting reviews...")
 with engine.begin() as connection:
-    for i in tqdm(range(0, total_records, batch_size),
-                 desc='Inserting reviews', unit='batch'):
+    for i in tqdm(
+            range(0, total_records, batch_size),
+            desc='Inserting reviews',
+            unit='batch'
+    ):
         batch = reviews_data[i:i + batch_size]
         result = connection.execute(
             yareviews.insert().returning(yareviews.c.review_id),
@@ -168,8 +184,11 @@ with engine.begin() as connection:
 # Insert review-rubrics mappings in batches
 print("Inserting review-rubrics mappings...")
 with engine.begin() as connection:
-    for i in tqdm(range(0, len(review_rubrics_data), batch_size),
-                 desc='Inserting mappings', unit='batch'):
+    for i in tqdm(
+            range(0, len(review_rubrics_data), batch_size),
+            desc='Inserting mappings',
+            unit='batch'
+    ):
         batch = review_rubrics_data[i:i + batch_size]
         connection.execute(review_rubrics.insert(), batch)
 

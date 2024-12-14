@@ -116,26 +116,22 @@ if [ ! -f ".env" ]; then
     # Prompt for OpenRouter API key
     OPENROUTER_KEY=$(prompt_secret "OpenRouter API Key" "your_api_key_here")
     
-    # Database configuration
-    DB_HOST=$(prompt_secret "Database Host" "localhost")
-    DB_PORT=$(prompt_secret "Database Port" "5432")
-    DB_NAME=$(prompt_secret "Database Name" "postgres")
-    DB_USER=$(prompt_secret "Database User" "postgres")
-    DB_PASSWORD=$(cat secrets/db_password.txt)
-    
     # Security settings
     MAX_REQUESTS=$(prompt_secret "Max Requests per Hour" "100")
     
-    # Create .env file
+    # Get database password
+    DB_PASSWORD=$(cat secrets/db_password.txt)
+    
+    # Create .env file with fixed database configuration
     cat > .env << EOL
 # OpenRouter API Configuration
 OPENROUTER_API_KEY=${OPENROUTER_KEY}
 
-# Database Configuration
-DB_HOST=${DB_HOST}
-DB_PORT=${DB_PORT}
-DB_NAME=${DB_NAME}
-DB_USER=${DB_USER}
+# Database Configuration (using TimescaleDB defaults)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
 DB_PASSWORD=${DB_PASSWORD}
 
 # Security Settings
@@ -143,6 +139,11 @@ MAX_REQUESTS_PER_HOUR=${MAX_REQUESTS}
 EOL
     chmod 600 .env
     check_status ".env file creation"
+    
+    echo -e "\nDatabase Configuration Notes:"
+    echo "- Using default TimescaleDB user 'postgres' as recommended"
+    echo "- Database password auto-generated in secrets/db_password.txt"
+    echo "- Database runs in Docker container on localhost:5432"
 fi
 
 print_header "Verifying project structure"
