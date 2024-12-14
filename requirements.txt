@@ -1,21 +1,28 @@
-# dev
+# Development
 pre-commit
 ruff
-streamlit
+streamlit>=1.24.0  # For modern UI components
 
-# llm
+# LLM Integration
 langgraph
-openai  # openrouter uses openai-compatible API
-python-dotenv  # for environment variables management
+openai  # OpenRouter uses OpenAI-compatible API
+python-dotenv  # Environment variables management
+typing-extensions  # For TypedDict support
 
-# data processing
+# Data Processing
 pandas
+numpy
 tqdm
 transformers
 sentence-transformers
 torch
 
-# db
+# Database
 pgvector
 sqlalchemy
 psycopg2-binary
+psycopg-binary
+
+# Logging & Time
+python-dateutil
+pytz  # For proper timezone handling
