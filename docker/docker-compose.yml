@@ -20,13 +20,12 @@ services:
       - "127.0.0.1:5432:5432"  # Only allow local connections
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
+      - ../secrets/db_password.txt:/run/secrets/db_password:ro
     environment:
       - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
       - POSTGRES_DB=postgres
       - max_connections=100
       - shared_buffers=1024MB
-    secrets:
-      - db_password
     deploy:
       resources:
         limits:
@@ -45,7 +44,3 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-secrets:
-  db_password:
-    file: ../secrets/db_password.txt
