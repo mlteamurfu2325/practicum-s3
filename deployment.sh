@@ -159,8 +159,12 @@ read -r download_choice
 
 if [[ $download_choice =~ ^[Yy]$ ]] || [[ -z $download_choice ]]; then
     print_header "Downloading pre-generated embeddings"
-    mega-get "https://mega.nz/file/WVB3gIDT#NDUcZMcCCEla7mtpvAdk2ecMkQ0oOgtDMoSBa1dglDA" "data/geo-reviews-enriched.parquet"
-    check_status "Embeddings download"
+    if [ -f "data/geo-reviews-enriched.parquet" ]; then
+        echo "✓ Pre-generated embeddings file already exists, skipping download"
+    else
+        mega-get "https://mega.nz/file/WVB3gIDT#NDUcZMcCCEla7mtpvAdk2ecMkQ0oOgtDMoSBa1dglDA" "data/geo-reviews-enriched.parquet"
+        check_status "Embeddings download"
+    fi
 else
     print_header "Processing raw dataset"
     echo "Starting data processing pipeline..."
@@ -259,6 +263,14 @@ print_header "Starting Docker containers"
 start_docker_containers
 
 print_header "Setting up development environment"
+# Install virtualenv if not present
+if ! command -v virtualenv &> /dev/null; then
+    echo "Installing python3-virtualenv..."
+    apt-get update
+    apt-get install -y python3-virtualenv
+    check_status "virtualenv installation"
+fi
+
 # Create virtual environment if it doesn't exist
 if [ ! -d ".venv" ]; then
     echo "Creating virtual environment..."
