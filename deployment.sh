@@ -6,6 +6,10 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Capture the original user who invoked sudo
+ORIGINAL_USER=$(logname)
+ORIGINAL_HOME=$(eval echo ~$ORIGINAL_USER)
+
 # Store the full script path
 SCRIPT_PATH=$(readlink -f "$0")
 
@@ -13,6 +17,11 @@ SCRIPT_PATH=$(readlink -f "$0")
 exec 1> >(tee "deployment.log") 2>&1
 echo "Deployment started at $(date)"
 echo "----------------------------------------"
+
+# Function to run commands as the original user
+run_as_user() {
+    sudo -u $ORIGINAL_USER "$@"
+}
 
 # Function to print section headers
 print_header() {
@@ -33,7 +42,7 @@ check_status() {
 
 # Function to check Python version
 check_python_version() {
-    python3 -c "import sys; exit(0) if sys.version_info >= (3, 8) else exit(1)" 2>/dev/null
+    run_as_user python3 -c "import sys; exit(0) if sys.version_info >= (3, 8) else exit(1)" 2>/dev/null
     if [ $? -ne 0 ]; then
         echo -e "✗ Error: Python 3.8 or higher is required\n"
         exit 1
@@ -119,8 +128,8 @@ check_md5sum() {
 }
 
 print_header "Setting up data directory"
-mkdir -p data
-chmod 750 data
+run_as_user mkdir -p data
+run_as_user chmod 750 data
 check_status "Data directory setup"
 
 print_header "Checking Ubuntu version"
@@ -162,7 +171,7 @@ if [[ $download_choice =~ ^[Yy]$ ]] || [[ -z $download_choice ]]; then
     if [ -f "data/geo-reviews-enriched.parquet" ]; then
         echo "✓ Pre-generated embeddings file already exists, skipping download"
     else
-        mega-get "https://mega.nz/file/WVB3gIDT#NDUcZMcCCEla7mtpvAdk2ecMkQ0oOgtDMoSBa1dglDA" "data/geo-reviews-enriched.parquet"
+        run_as_user mega-get "https://mega.nz/file/WVB3gIDT#NDUcZMcCCEla7mtpvAdk2ecMkQ0oOgtDMoSBa1dglDA" "data/geo-reviews-enriched.parquet"
         check_status "Embeddings download"
     fi
 else
@@ -172,7 +181,7 @@ else
     # Check if raw TSKV file exists with correct md5sum
     if ! check_md5sum "data/geo-reviews-dataset-2023.tskv" "857fe8ae8af5f5165da3e1674e6f588a"; then
         echo "Downloading geo-reviews dataset..."
-        mkdir -p data
+        run_as_user mkdir -p data
         wget -O data/geo-reviews-dataset-2023.tskv https://github.com/yandex/geo-reviews-dataset-2023/raw/refs/heads/master/geo-reviews-dataset-2023.tskv
         
         if ! check_md5sum "data/geo-reviews-dataset-2023.tskv" "857fe8ae8af5f5165da3e1674e6f588a"; then
@@ -183,17 +192,17 @@ else
 
     # Step 1: Convert TSKV to Parquet
     echo "Converting TSKV to Parquet format..."
-    python src/reviews-processing/export_to_parquet.py
+    run_as_user python src/reviews-processing/export_to_parquet.py
     check_status "TSKV to Parquet conversion"
     
     # Step 2: Check token limits
     echo "Checking and processing token limits..."
-    python src/reviews-processing/check_token_limit.py
+    run_as_user python src/reviews-processing/check_token_limit.py
     check_status "Token limit processing"
     
     # Step 3: Generate embeddings
     echo "Generating embeddings (this may take a while)..."
-    python src/reviews-processing/enrich_with_embeddings.py
+    run_as_user python src/reviews-processing/enrich_with_embeddings.py
     check_status "Embeddings generation"
 fi
 
@@ -201,8 +210,8 @@ print_header "Checking system requirements"
 check_python_version
 
 print_header "Creating logs directory"
-mkdir -p logs
-chmod 750 logs
+run_as_user mkdir -p logs
+run_as_user chmod 750 logs
 check_status "Logs directory setup"
 
 print_header "Setting up Docker environment"
@@ -235,12 +244,12 @@ if [ ! -f ".env" ]; then
     DB_PASSWORD=$(openssl rand -base64 32)
     
     # Create .env file with configuration
-    cat > .env << EOL
+    run_as_user bash -c "cat > .env << EOL
 # OpenRouter API Configuration
 OPENROUTER_API_KEY=${OPENROUTER_KEY}
 
 # Database Configuration
-DB_HOST=localhost
+DB_HOST=localhost  # Changed back to localhost since we're using host networking
 DB_PORT=5432
 DB_NAME=postgres
 DB_USER=postgres
@@ -249,14 +258,14 @@ POSTGRES_PASSWORD=${DB_PASSWORD}  # Required by Docker
 
 # Security Settings
 MAX_REQUESTS_PER_HOUR=${MAX_REQUESTS}
-EOL
-    chmod 600 .env
+EOL"
+    run_as_user chmod 600 .env
     check_status ".env file creation"
     
     echo -e "\nDatabase Configuration Notes:"
     echo "- Using default TimescaleDB user 'postgres'"
     echo "- Database password auto-generated and stored in .env"
-    echo "- Database runs in Docker container on localhost:5432"
+    echo "- Database accessible via localhost"
 fi
 
 print_header "Starting Docker containers"
@@ -274,26 +283,23 @@ fi
 # Create virtual environment if it doesn't exist
 if [ ! -d ".venv" ]; then
     echo "Creating virtual environment..."
-    python3 -m virtualenv .venv
+    run_as_user python3 -m virtualenv .venv
     check_status "Virtual environment creation"
 fi
 
-# Activate virtual environment
-source .venv/bin/activate
-check_status "Virtual environment activation"
-
 print_header "Upgrading pip and installing dependencies"
-python -m pip install --upgrade pip
+# Use the full path to pip within the virtual environment
+run_as_user .venv/bin/pip install --upgrade pip
 check_status "Pip upgrade"
 
 # Install requirements
 echo "Installing dependencies..."
-pip install -r requirements.txt
+run_as_user .venv/bin/pip install -r requirements.txt
 check_status "Dependencies installation"
 
 print_header "Database Import"
 echo "Importing reviews into PostgreSQL database..."
-python src/db-importer/pg-reviews-importer.py
+run_as_user .venv/bin/python src/db-importer/pg-reviews-importer.py
 check_status "Database import"
 
 print_header "Verifying project structure"

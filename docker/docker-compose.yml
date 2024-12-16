@@ -14,10 +14,7 @@ services:
   timescaledb:
     image: timescale/timescaledb-ha:pg16
     container_name: timescaledb
-    networks:
-      - backend
-    ports:
-      - "127.0.0.1:5432:5432"  # Only allow local connections
+    network_mode: host  # Use host networking
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
     env_file: ../.env
