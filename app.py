@@ -1,7 +1,62 @@
 import streamlit as st
 from src.llm import ReviewGenerator
 from src.db.db_connection import get_unique_rubrics, get_relevant_reviews
+import time
+import logging
+from datetime import datetime
+import os
+from dotenv import load_dotenv
 
+
+# Load environment variables
+load_dotenv()
+
+# Set up logging
+os.makedirs('logs', exist_ok=True)
+logging.basicConfig(
+    filename=f'logs/app-{datetime.now():%Y-%m-%d}.log',
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s'
+)
+
+
+# Rate limiting implementation
+class RateLimiter:
+    def __init__(self, max_requests=100, window_seconds=3600):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.requests = {}
+
+    def is_allowed(self, ip):
+        now = time.time()
+        if ip not in self.requests:
+            self.requests[ip] = []
+
+        # Clean old requests
+        self.requests[ip] = [
+            req for req in self.requests[ip]
+            if req > now - self.window_seconds
+        ]
+
+        if len(self.requests[ip]) >= self.max_requests:
+            logging.warning(
+                f"Rate limit exceeded for IP: {ip}. "
+                f"Requests in window: {len(self.requests[ip])}"
+            )
+            return False
+
+        self.requests[ip].append(now)
+        return True
+
+
+# Initialize rate limiter in session state
+if 'rate_limiter' not in st.session_state:
+    max_requests = int(os.getenv('MAX_REQUESTS_PER_HOUR', '100'))
+    timeout = int(os.getenv('TIMEOUT_SECONDS', '15'))
+    st.session_state.rate_limiter = RateLimiter(
+        max_requests=max_requests,
+        window_seconds=3600
+    )
 
 # Initialize ReviewGenerator in session state if not exists
 if 'review_generator' not in st.session_state:
@@ -10,10 +65,28 @@ if 'review_generator' not in st.session_state:
 
 def generate_review(theme, rating, category, reviews):
     """Helper function to generate review with spinner"""
+    # Get client IP from Streamlit's internal state
+    client_ip = (
+        st.get_client_ip() if hasattr(st, 'get_client_ip') else 'unknown'
+    )
+
+    # Check rate limit
+    if not st.session_state.rate_limiter.is_allowed(client_ip):
+        st.error(
+            "Превышен лимит запросов. Пожалуйста, попробуйте позже."
+        )
+        return
+
     with st.spinner("Генерируем отзыв..."):
         reviews_text = "\n\n".join(
             f"Пример {i+1}:\n{review}" 
             for i, review in enumerate(reviews)
+        )
+
+        # Log the generation attempt
+        logging.info(
+            f"Review generation attempt - IP: {client_ip}, "
+            f"Theme: {theme}, Rating: {rating}, Category: {category}"
         )
 
         review, error = st.session_state.review_generator.generate_review(
@@ -24,8 +97,17 @@ def generate_review(theme, rating, category, reviews):
         )
 
         if error:
+            logging.error(
+                f"Review generation failed - IP: {client_ip}, Error: {error}"
+            )
             st.error(error)
             return
+
+        # Log successful generation
+        logging.info(
+            f"Review generated successfully - IP: {client_ip}, "
+            f"Length: {len(review)}"
+        )
 
         st.markdown(
             '<div class="card">'
@@ -239,13 +321,16 @@ if generate:
         reviews, exact_match = get_relevant_reviews(category, rating)
 
         if not reviews:
-            st.error(f"В базе данных не найдено отзывов для рубрики '{category}'")
+            st.error(
+                f"В базе данных не найдено отзывов для рубрики '{category}'"
+            )
         else:
             if not exact_match:
-                st.info(
-                    f"Для рубрики '{category}' не найдено отзывов с рейтингом {rating}. "
+                msg = (
+                    "Для рубрики '{}' не найдено отзывов с рейтингом {}. "
                     "Будут использованы случайные отзывы из этой рубрики."
-                )
+                ).format(category, rating)
+                st.info(msg)
 
             # Proceed with generation
             generate_review(theme, rating, category, reviews)

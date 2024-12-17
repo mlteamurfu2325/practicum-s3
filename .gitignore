@@ -13,8 +13,26 @@
 # do not ignore .pre-commit-config.yaml
 !.pre-commit-config.yaml
 
+# do not ignore .env.example
+!.env.example
+
 # ignore Python cache
 **/__pycache__/
 
 # ignore data/ dir and all its contents
 data/
+
+# Security-related
+secrets/
+.env
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.keystore
+*.jks
+
+# Logs
+logs/
+*.log

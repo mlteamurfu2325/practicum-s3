@@ -1,6 +1,10 @@
 networks:
-  local-rag:
+  frontend:
     driver: bridge
+    internal: false  # For Streamlit access
+  backend:
+    driver: bridge
+    internal: true   # For DB and internal services
 
 volumes:
   timescaledb_data:
@@ -10,15 +14,21 @@ services:
   timescaledb:
     image: timescale/timescaledb-ha:pg16
     container_name: timescaledb
-    networks:
-      - local-rag
-    ports:
-      - "5432:5432"
+    network_mode: host  # Use host networking
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=postgres
+    env_file: ../.env
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+    user: postgres:postgres
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
