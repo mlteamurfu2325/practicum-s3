@@ -1,6 +1,7 @@
 import streamlit as st
 from src.llm import ReviewGenerator
 from src.db.db_connection import get_unique_rubrics, get_relevant_reviews
+from src.utils.metrics import calculate_bleu, calculate_rouge
 import time
 import logging
 from datetime import datetime
@@ -121,6 +122,24 @@ def generate_review(theme, rating, category, reviews):
             label_visibility="collapsed"
         )
 
+        # Calculate and display metrics
+        bleu_score = calculate_bleu(review, reviews)
+        rouge_scores = calculate_rouge(review, reviews)
+
+        # Display metrics in a nice format
+        st.markdown("### 📊 Метрики качества")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("BLEU Score", f"{bleu_score:.2%}")
+        
+        with col2:
+            st.markdown("**ROUGE Scores:**")
+            st.markdown(f"- ROUGE-1: {rouge_scores['rouge1']:.2%}")
+            st.markdown(f"- ROUGE-2: {rouge_scores['rouge2']:.2%}")
+            st.markdown(f"- ROUGE-L: {rouge_scores['rougeL']:.2%}")
+
+        # Show reference reviews
         expander_text = (
             "📚 Показать реальные отзывы, использованные для вдохновения"
         )
@@ -132,6 +151,16 @@ def generate_review(theme, rating, category, reviews):
 
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # Add logs expander
+        with st.expander("📋 Показать логи генерации", expanded=False):
+            # Read the latest log entries
+            try:
+                with open(f'logs/app-{datetime.now():%Y-%m-%d}.log', 'r') as f:
+                    logs = f.readlines()[-10:]  # Show last 10 log entries
+                for log in logs:
+                    st.text(log.strip())
+            except Exception as e:
+                st.error(f"Ошибка при чтении логов: {str(e)}")
 
 # Page configuration
 st.set_page_config(
@@ -248,6 +277,18 @@ st.markdown("""
     .streamlit-expanderHeader {
         font-size: 1.3rem !important;
         font-weight: 500;
+    }
+
+    /* Metrics styling */
+    .metric-value {
+        font-size: 1.5rem !important;
+        font-weight: bold;
+        color: #FF4B2B;
+    }
+    
+    .metric-label {
+        font-size: 1.1rem !important;
+        color: #fafafa;
     }
     </style>
 """, unsafe_allow_html=True)

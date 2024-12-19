@@ -1,5 +1,7 @@
 # Development
 pre-commit
+nltk  # For BLEU score calculation
+rouge-score  # For ROUGE metrics
 ruff
 streamlit>=1.24.0  # For modern UI components
 
