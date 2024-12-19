@@ -127,6 +127,159 @@ check_md5sum() {
     return 0
 }
 
+# Function to setup UFW and configure security rules
+setup_ufw() {
+    print_header "Setting up UFW firewall"
+    
+    # Check if UFW is installed
+    if ! command -v ufw &> /dev/null; then
+        echo "UFW not found. Installing UFW..."
+        apt-get update
+        apt-get install -y ufw
+        check_status "UFW installation"
+    else
+        echo "✓ UFW is already installed"
+    fi
+
+    echo "Resetting UFW to default configuration..."
+    ufw --force reset
+    check_status "UFW reset"
+
+    echo "Configuring UFW rules..."
+    
+    # Default policies
+    ufw default deny incoming
+    ufw default allow outgoing
+    
+    # Allow SSH (essential to prevent lockout)
+    echo "Allowing SSH connections..."
+    ufw allow ssh
+    
+    # Configure PostgreSQL UFW rules
+    echo "Configuring PostgreSQL rules..."
+    
+    # Allow internal networks to PostgreSQL
+    ufw allow from 10.0.0.0/8 to any port 5432
+    ufw allow from 172.16.0.0/12 to any port 5432
+    ufw allow from 192.168.0.0/16 to any port 5432
+    ufw allow from 127.0.0.0/8 to any port 5432
+    
+    # Deny all other incoming connections to PostgreSQL
+    ufw deny to any port 5432
+    
+    # Enable UFW
+    echo "Enabling UFW..."
+    ufw --force enable
+    
+    check_status "UFW configuration"
+}
+
+# Function to print UFW status
+print_ufw_status() {
+    print_header "Current UFW Rules"
+    echo "IMPORTANT: Please review these rules carefully to ensure you haven't lost access!"
+    echo "Particularly, verify that SSH (port 22) is allowed."
+    echo "----------------------------------------"
+    ufw status verbose
+    echo "----------------------------------------"
+}
+
+# Function to get external IP address
+get_external_ip() {
+    # Try different IP services until we get a valid response
+    local ip=""
+    
+    # Array of IP services to try
+    local services=(
+        "https://api.ipify.org"
+        "https://icanhazip.com"
+        "https://ifconfig.me"
+        "https://ipecho.net/plain"
+    )
+    
+    for service in "${services[@]}"; do
+        ip=$(curl -s --connect-timeout 5 "$service" 2>/dev/null)
+        
+        # Check if we got a valid IPv4 address
+        if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "$ip"
+            return 0
+        fi
+    done
+    
+    # If all services fail
+    echo "Error: Could not determine external IP" >&2
+    return 1
+}
+
+# Function to setup domain with myaddr.tools
+setup_domain() {
+    # Check if curl is installed
+    if ! command -v curl &> /dev/null; then
+        echo "Installing curl..."
+        apt-get update
+        apt-get install -y curl
+        check_status "curl installation"
+    fi
+
+    # Get external IP
+    EXTERNAL_IP=$(get_external_ip)
+    if [ $? -ne 0 ]; then
+        echo "Failed to get external IP"
+        return 1
+    fi
+    echo "External IP detected: $EXTERNAL_IP"
+
+    echo "Enter your myaddr.tools domain key:"
+    read -r DOMAIN_KEY
+    
+    echo "Enter your full domain name (e.g., myapp.myaddr.tools):"
+    read -r DOMAIN_NAME
+
+    # Update domain
+    echo "Updating domain with IP address..."
+    RESPONSE=$(curl -s -w "%{http_code}" -d "key=${DOMAIN_KEY}" -d "ip=${EXTERNAL_IP}" https://myaddr.tools/update)
+    HTTP_CODE=${RESPONSE: -3}
+    RESPONSE_BODY=${RESPONSE%???}  # Remove last 3 characters (status code)
+    
+    if [ "$HTTP_CODE" = "200" ]; then
+        echo "✓ Domain successfully configured"
+        return 0
+    else
+        echo "✗ Failed to configure domain. HTTP Code: $HTTP_CODE"
+        [ ! -z "$RESPONSE_BODY" ] && echo "Response: $RESPONSE_BODY"
+        return 1
+    fi
+}
+
+# Function to setup Caddy
+setup_caddy() {
+    print_header "Setting up Caddy"
+    
+    # Install Caddy
+    apt-get update
+    apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+    apt-get update
+    apt-get install -y caddy
+    
+    # Configure Caddyfile
+    echo "$DOMAIN_NAME {
+    reverse_proxy localhost:8501
+}" > /etc/caddy/Caddyfile
+    
+    # Allow HTTPS in UFW
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+    
+    # Start Caddy
+    systemctl enable caddy
+    systemctl restart caddy
+    
+    check_status "Caddy setup"
+}
+
 print_header "Setting up data directory"
 run_as_user mkdir -p data
 run_as_user chmod 750 data
@@ -302,39 +455,59 @@ echo "Importing reviews into PostgreSQL database..."
 run_as_user .venv/bin/python src/db-importer/pg-reviews-importer.py
 check_status "Database import"
 
-print_header "Verifying project structure"
-# Check if required directories exist
-required_dirs=(
-    "src/llm"
-    "src/reviews-processing"
-    "docs"
-    "data"
-    "logs"
-    "docker"
-)
+print_header "Setting up UFW and PostgreSQL rules"
+setup_ufw
 
-for dir in "${required_dirs[@]}"; do
-    if [ ! -d "$dir" ]; then
-        echo -e "✗ Error: Required directory $dir is missing\n"
-        exit 1
+print_header "Streamlit Deployment Configuration"
+echo "How would you like to run the Streamlit app?"
+echo "1. By IP address (no HTTPS)"
+echo "2. With a free domain name (HTTPS enabled)"
+read -p "Enter your choice (1 or 2): " STREAMLIT_CHOICE
+
+if [ "$STREAMLIT_CHOICE" = "2" ]; then
+    echo "Do you already have a myaddr.tools domain?"
+    echo "1. Yes, I have a domain and key"
+    echo "2. No, I need to claim one"
+    read -p "Enter your choice (1 or 2): " DOMAIN_CHOICE
+    
+    if [ "$DOMAIN_CHOICE" = "2" ]; then
+        echo "Please visit https://myaddr.tools/claim to claim your domain"
+        echo "After claiming your domain, press Enter to continue"
+        read
     fi
-done
-echo -e "✓ Project structure verification passed\n"
-
-print_header "Security Checklist"
-echo "Please verify the following:"
-echo "1. .env file exists and has correct permissions (600)"
-echo "2. logs/ directory has correct permissions (750)"
-echo -e "\nFile permissions:"
-ls -la .env 2>/dev/null || echo "❌ .env file missing"
-ls -ld logs/ 2>/dev/null || echo "❌ logs directory missing"
-echo -e "\n"
+    
+    if setup_domain; then
+        setup_caddy
+        echo "Starting Streamlit with Caddy..."
+        run_as_user .venv/bin/streamlit run app.py --server.address 127.0.0.1 --server.port 8501
+        echo "✓ Streamlit is now accessible at https://$DOMAIN_NAME"
+    else
+        echo "Failed to set up domain. Falling back to IP-based access..."
+        ufw allow 8501/tcp
+        run_as_user .venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+        echo "✓ Streamlit is now accessible at http://$EXTERNAL_IP:8501"
+    fi
+else
+    echo "Setting up IP-based access..."
+    ufw allow 8501/tcp
+    run_as_user .venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+    echo "✓ Streamlit is now accessible at http://$EXTERNAL_IP:8501"
+fi
 
 print_header "Setup complete!"
 echo -e "To complete the setup:\n"
 echo "1. Review your .env file"
-echo "2. Ensure all security permissions are correct (see above)"
-echo -e "3. Run: streamlit run app.py\n"
+echo "2. Ensure all security permissions are correct"
+if [ "$STREAMLIT_CHOICE" = "2" ] && [ "$HTTP_CODE" = "200" ]; then
+    echo "3. Access your app at https://$DOMAIN_NAME"
+else
+    echo "3. Access your app at http://$EXTERNAL_IP:8501"
+fi
+
+print_header "Final Security Check"
+print_ufw_status
+echo "⚠️  IMPORTANT: Make sure SSH access (port 22) is allowed before disconnecting!"
+echo "If you get locked out, you'll need physical access or console access to fix it."
 
 echo -e "\nDeployment finished at $(date)"
 echo "----------------------------------------"
