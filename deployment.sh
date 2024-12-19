@@ -127,7 +127,7 @@ check_md5sum() {
     return 0
 }
 
-# Function to setup UFW and configure PostgreSQL rules
+# Function to setup UFW and configure security rules
 setup_ufw() {
     print_header "Setting up UFW firewall"
     
@@ -141,8 +141,22 @@ setup_ufw() {
         echo "✓ UFW is already installed"
     fi
 
+    echo "Resetting UFW to default configuration..."
+    ufw --force reset
+    check_status "UFW reset"
+
+    echo "Configuring UFW rules..."
+    
+    # Default policies
+    ufw default deny incoming
+    ufw default allow outgoing
+    
+    # Allow SSH (essential to prevent lockout)
+    echo "Allowing SSH connections..."
+    ufw allow ssh
+    
     # Configure PostgreSQL UFW rules
-    echo "Configuring PostgreSQL UFW rules..."
+    echo "Configuring PostgreSQL rules..."
     
     # Allow internal networks to PostgreSQL
     ufw allow from 10.0.0.0/8 to any port 5432
@@ -153,7 +167,49 @@ setup_ufw() {
     # Deny all other incoming connections to PostgreSQL
     ufw deny to any port 5432
     
-    check_status "PostgreSQL UFW rules configuration"
+    # Enable UFW
+    echo "Enabling UFW..."
+    ufw --force enable
+    
+    check_status "UFW configuration"
+}
+
+# Function to print UFW status
+print_ufw_status() {
+    print_header "Current UFW Rules"
+    echo "IMPORTANT: Please review these rules carefully to ensure you haven't lost access!"
+    echo "Particularly, verify that SSH (port 22) is allowed."
+    echo "----------------------------------------"
+    ufw status verbose
+    echo "----------------------------------------"
+}
+
+# Function to get external IP address
+get_external_ip() {
+    # Try different IP services until we get a valid response
+    local ip=""
+    
+    # Array of IP services to try
+    local services=(
+        "https://api.ipify.org"
+        "https://icanhazip.com"
+        "https://ifconfig.me"
+        "https://ipecho.net/plain"
+    )
+    
+    for service in "${services[@]}"; do
+        ip=$(curl -s --connect-timeout 5 "$service" 2>/dev/null)
+        
+        # Check if we got a valid IPv4 address
+        if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "$ip"
+            return 0
+        fi
+    done
+    
+    # If all services fail
+    echo "Error: Could not determine external IP" >&2
+    return 1
 }
 
 # Function to setup domain with myaddr.tools
@@ -167,11 +223,12 @@ setup_domain() {
     fi
 
     # Get external IP
-    EXTERNAL_IP=$(curl -s ifconfig.me)
-    if [ -z "$EXTERNAL_IP" ]; then
+    EXTERNAL_IP=$(get_external_ip)
+    if [ $? -ne 0 ]; then
         echo "Failed to get external IP"
         return 1
     fi
+    echo "External IP detected: $EXTERNAL_IP"
 
     echo "Enter your myaddr.tools domain key:"
     read -r DOMAIN_KEY
@@ -180,14 +237,17 @@ setup_domain() {
     read -r DOMAIN_NAME
 
     # Update domain
+    echo "Updating domain with IP address..."
     RESPONSE=$(curl -s -w "%{http_code}" -d "key=${DOMAIN_KEY}" -d "ip=${EXTERNAL_IP}" https://myaddr.tools/update)
     HTTP_CODE=${RESPONSE: -3}
+    RESPONSE_BODY=${RESPONSE%???}  # Remove last 3 characters (status code)
     
     if [ "$HTTP_CODE" = "200" ]; then
         echo "✓ Domain successfully configured"
         return 0
     else
         echo "✗ Failed to configure domain. HTTP Code: $HTTP_CODE"
+        [ ! -z "$RESPONSE_BODY" ] && echo "Response: $RESPONSE_BODY"
         return 1
     fi
 }
@@ -443,6 +503,11 @@ if [ "$STREAMLIT_CHOICE" = "2" ] && [ "$HTTP_CODE" = "200" ]; then
 else
     echo "3. Access your app at http://$EXTERNAL_IP:8501"
 fi
+
+print_header "Final Security Check"
+print_ufw_status
+echo "⚠️  IMPORTANT: Make sure SSH access (port 22) is allowed before disconnecting!"
+echo "If you get locked out, you'll need physical access or console access to fix it."
 
 echo -e "\nDeployment finished at $(date)"
 echo "----------------------------------------"
