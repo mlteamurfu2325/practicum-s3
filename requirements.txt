@@ -10,7 +10,11 @@ python-dotenv  # Environment variables management
 typing-extensions  # For TypedDict support
 
 # Data Processing
+jupytext
+ipykernel
+ipywidgets
 pandas
+plotly
 numpy
 tqdm
 transformers

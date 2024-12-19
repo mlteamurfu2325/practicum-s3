@@ -35,3 +35,12 @@ repos:
     rev: v8.21.2
     hooks:
       - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: jupytext-sync
+        name: Jupytext Notebook Sync
+        entry: .hooks/pre-push
+        language: script
+        pass_filenames: false
+        stages: [push]
