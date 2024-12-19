@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Always check EDA notebook status on push
+echo "Checking EDA notebook status..."
+
+# Check if Python file exists
+if [ ! -f "eda/yandex-reviews-eda.py" ]; then
+    echo "EDA Python file not found!"
+    exit 1
+fi
+
+# Check if notebook exists or if Python file was modified
+if [ ! -f "eda/yandex-reviews-eda.ipynb" ] || [ "eda/yandex-reviews-eda.py" -nt "eda/yandex-reviews-eda.ipynb" ]; then
+    echo "Converting Python file to notebook..."
+    jupytext --to notebook eda/yandex-reviews-eda.py
+    
+    if [ $? -ne 0 ]; then
+        echo "Error converting Python file to notebook!"
+        exit 1
+    fi
+    
+    # Add the notebook to git
+    git add eda/yandex-reviews-eda.ipynb
+    git commit -m "chore: update EDA notebook from Python script"
+fi
+
+exit 0
