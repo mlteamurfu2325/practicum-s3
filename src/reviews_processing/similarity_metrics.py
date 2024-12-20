@@ -1,38 +1,40 @@
 """Module for calculating similarity metrics between reviews."""
 
-import nltk
+import spacy
+from spacy.language import Language
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from rouge_score import rouge_scorer
 from typing import List, Dict, Tuple
 import numpy as np
+import subprocess
+import sys
 
-# Download required NLTK data
-def ensure_nltk_data():
-    """Ensure all required NLTK data is downloaded."""
+def ensure_spacy_model():
+    """Ensure the Russian language model is installed."""
     try:
-        # Download punkt_tab for NLTK >= 3.8.2
-        try:
-            nltk.data.find('tokenizers/punkt_tab')
-        except LookupError:
-            nltk.download('punkt_tab', quiet=True)
-            
-        # Verify Russian language support
-        try:
-            nltk.data.find('tokenizers/punkt_tab/russian')
-        except LookupError:
-            # If verification fails, try downloading again
-            nltk.download('punkt_tab', quiet=True)
-            
-        if not nltk.data.find('tokenizers/punkt_tab/russian'):
-            raise RuntimeError("Russian language support not available in punkt_tab")
-            
-    except Exception as e:
-        print(f"Error ensuring NLTK data: {str(e)}")
-        print("Please ensure you have NLTK >= 3.8.2 installed")
+        spacy.load('ru_core_news_sm')
+    except OSError:
+        print("Downloading Russian language model...")
+        subprocess.check_call([sys.executable, "-m", "spacy", "download", "ru_core_news_sm"])
 
-# Initialize NLTK data
-ensure_nltk_data()
+# Initialize spaCy
+ensure_spacy_model()
+nlp = spacy.load('ru_core_news_sm')
 
+def tokenize_text(text: str, nlp: Language) -> List[str]:
+    """
+    Tokenize text using spaCy's Russian model.
+    
+    Args:
+        text: Text to tokenize
+        nlp: Loaded spaCy model
+        
+    Returns:
+        List of tokens
+    """
+    doc = nlp(text.lower())
+    # Use lemmatization for better matching
+    return [token.lemma_ for token in doc if not token.is_punct and not token.is_space]
 
 def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> List[Dict[str, float]]:
     """
@@ -45,9 +47,7 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
     Returns:
         List of dictionaries containing BLEU and ROUGE scores for each reference review
     """
-    # Ensure NLTK data is available
-    ensure_nltk_data()
-    # Initialize ROUGE scorer
+    # Initialize ROUGE scorer with stemming for Russian
     scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
     
     # Initialize BLEU smoothing
@@ -55,10 +55,12 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
     
     metrics = []
     
+    # Tokenize generated review once
+    gen_tokens = tokenize_text(generated_review, nlp)
+    
     for ref_review in reference_reviews:
-        # Calculate BLEU score with Russian tokenization
-        ref_tokens = nltk.word_tokenize(ref_review.lower(), language='russian')
-        gen_tokens = nltk.word_tokenize(generated_review.lower(), language='russian')
+        # Calculate BLEU score with spaCy tokenization
+        ref_tokens = tokenize_text(ref_review, nlp)
         bleu_score = sentence_bleu([ref_tokens], gen_tokens, smoothing_function=smoothing)
         
         # Calculate ROUGE scores

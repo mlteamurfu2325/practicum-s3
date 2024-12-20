@@ -20,7 +20,7 @@ tqdm
 transformers
 sentence-transformers
 torch
-nltk>=3.8.2  # Required for punkt_tab package
+spacy>=3.0.0  # For Russian language tokenization
 rouge-score
 
 # Database
