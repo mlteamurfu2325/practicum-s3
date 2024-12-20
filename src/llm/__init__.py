@@ -5,6 +5,7 @@ import logging
 import sys
 import re
 import streamlit as st
+from datetime import datetime
 
 from langgraph.graph import StateGraph
 from openai import OpenAI
@@ -32,9 +33,12 @@ class SessionStateHandler(logging.Handler):
         self.model_num = model_num
 
     def emit(self, record):
+        # Format timestamp
+        timestamp = datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S,%03d')
+        
         # Format HTTP requests differently
         if record.msg.startswith('HTTP Request:'):
-            log_entry = f"{record.asctime} - [INFO] {record.msg}"
+            log_entry = f"{timestamp} - [INFO] {record.msg}"
         else:
             log_entry = self.format(record)
             
