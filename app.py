@@ -9,6 +9,7 @@ import os
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
+from src.config import AVAILABLE_MODELS, DEFAULT_MODEL
 
 
 # Load environment variables
@@ -74,13 +75,16 @@ if 'rate_limiter' not in st.session_state:
         window_seconds=3600
     )
 
-# Initialize ReviewGenerator in session state if not exists
-if 'review_generator' not in st.session_state:
-    st.session_state.review_generator = ReviewGenerator()
+# Initialize ReviewGenerators in session state if not exists
+if 'review_generator_1' not in st.session_state:
+    st.session_state.review_generator_1 = ReviewGenerator(DEFAULT_MODEL)
+
+if 'review_generator_2' not in st.session_state:
+    st.session_state.review_generator_2 = ReviewGenerator(DEFAULT_MODEL)
 
 
-def generate_review(theme, rating, category, reviews):
-    """Helper function to generate review with spinner"""
+def generate_review_comparison(theme, rating, category, reviews):
+    """Helper function to generate reviews with two different models"""
     # Get client IP from Streamlit's internal state
     client_ip = (
         st.get_client_ip() if hasattr(st, 'get_client_ip') else 'unknown'
@@ -93,127 +97,125 @@ def generate_review(theme, rating, category, reviews):
         )
         return
 
-    with st.spinner("Генерируем отзыв..."):
-        reviews_text = "\n\n".join(
-            f"Пример {i+1}:\n{review}" 
-            for i, review in enumerate(reviews)
-        )
+    reviews_text = "\n\n".join(
+        f"Пример {i+1}:\n{review}" 
+        for i, review in enumerate(reviews)
+    )
 
-        # Log the generation attempt
-        logging.info(
-            f"Review generation attempt - IP: {client_ip}, "
-            f"Theme: {theme}, Rating: {rating}, Category: {category}"
-        )
+    # Create two columns for side-by-side comparison
+    col1, col2 = st.columns(2)
 
-        review, error = st.session_state.review_generator.generate_review(
-            theme=theme,
-            rating=rating,
-            category=category,
-            real_reviews=reviews_text
-        )
-
-        if error:
-            logging.error(
-                f"Review generation failed - IP: {client_ip}, Error: {error}"
-            )
-            st.error(error)
-            return
-
-        # Log successful generation
-        logging.info(
-            f"Review generated successfully - IP: {client_ip}, "
-            f"Length: {len(review)}"
-        )
-
+    with col1:
         st.markdown(
-            '<div class="card">'
-            '<h2>🏁 Ваш отзыв готов!</h2>',
+            f'<div class="card"><h2>🤖 {AVAILABLE_MODELS[DEFAULT_MODEL]}</h2>',
             unsafe_allow_html=True
         )
-        st.text_area(
-            "Сгенерированный отзыв",
-            review,
-            height=200,
-            label_visibility="collapsed"
-        )
+        with st.spinner("Генерируем отзыв..."):
+            review1, error1 = st.session_state.review_generator_1.generate_review(
+                theme=theme,
+                rating=rating,
+                category=category,
+                real_reviews=reviews_text
+            )
 
-        # Calculate similarity metrics
-        metrics = calculate_metrics(review, reviews) if reviews else []
-        avg_scores = calculate_average_scores(metrics)
-        
-        expander_text = (
-            "📊 Метрики схожести с реальными отзывами"
-        )
-        with st.expander(expander_text, expanded=False):
-            if not reviews:
-                st.info("Реальные отзывы не использовались при генерации.")
+            if error1:
+                st.error(error1)
             else:
-                # Create DataFrame for metrics table
-                data = []
-                for i, (review_text, metric) in enumerate(zip(reviews, metrics), 1):
-                    data.append({
-                        'Номер': f'Отзыв {i}',
-                        'Текст': review_text,
-                        'BLEU': metric['bleu'],
-                        'ROUGE': metric['rouge'],
-                        'semantic': metric['semantic'],
-                        'combined': metric['combined']
-                    })
-                
-                # Calculate averages for all metrics
-                avg_bleu = np.mean([m['bleu'] for m in metrics])
-                avg_rouge = np.mean([m['rouge'] for m in metrics])
-                avg_semantic = np.mean([m['semantic'] for m in metrics])
-                avg_combined = np.mean([m['combined'] for m in metrics])
-                
-                # Add average row
-                data.append({
-                    'Номер': 'Среднее',
-                    'Текст': '',
-                    'BLEU': round(avg_bleu, 3),
-                    'ROUGE': round(avg_rouge, 3),
-                    'semantic': round(avg_semantic, 3),
-                    'combined': round(avg_combined, 3)
-                })
-                
-                df = pd.DataFrame(data)
-                st.dataframe(
-                    df,
-                    column_config={
-                        'Номер': st.column_config.TextColumn('№'),
-                        'Текст': st.column_config.TextColumn('Текст отзыва'),
-                        'BLEU': st.column_config.NumberColumn(
-                            'BLEU Score',
-                            help='Оценка схожести на основе n-грамм'
-                        ),
-                        'ROUGE': st.column_config.NumberColumn(
-                            'ROUGE Score',
-                            help='Оценка схожести на основе перекрытия слов'
-                        ),
-                        'semantic': st.column_config.NumberColumn(
-                            'Semantic Score',
-                            help='Оценка семантической схожести'
-                        ),
-                        'combined': st.column_config.NumberColumn(
-                            'Combined Score',
-                            help='Общая оценка схожести'
-                        )
-                    },
-                    hide_index=True
+                st.text_area(
+                    "Сгенерированный отзыв",
+                    review1,
+                    height=200,
+                    label_visibility="collapsed"
                 )
-                
-                # Add explanation of metrics below the table
-                st.markdown("""
-                ### ℹ️ О метриках схожести:
-                - **BLEU Score**: Оценивает схожесть на основе совпадения последовательностей слов
-                - **ROUGE Score**: Оценивает перекрытие слов между отзывами
-                - **Semantic Score**: Оценивает семантическую близость текстов
-                - **Combined Score**: Взвешенная комбинация всех метрик
-                
-                Все оценки находятся в диапазоне от 0 до 1, где 1 означает полное совпадение.
-                """)
+                metrics1 = calculate_metrics(review1, reviews) if reviews else []
+                show_metrics(metrics1, reviews)
 
-        st.markdown('</div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(
+            f'<div class="card"><h2>🤖 {AVAILABLE_MODELS[st.session_state.selected_model]}</h2>',
+            unsafe_allow_html=True
+        )
+        with st.spinner("Генерируем отзыв..."):
+            review2, error2 = st.session_state.review_generator_2.generate_review(
+                theme=theme,
+                rating=rating,
+                category=category,
+                real_reviews=reviews_text
+            )
+
+            if error2:
+                st.error(error2)
+            else:
+                st.text_area(
+                    "Сгенерированный отзыв",
+                    review2,
+                    height=200,
+                    label_visibility="collapsed"
+                )
+                metrics2 = calculate_metrics(review2, reviews) if reviews else []
+                show_metrics(metrics2, reviews)
+
+
+def show_metrics(metrics, reviews):
+    """Helper function to display metrics for a review"""
+    expander_text = "📊 Метрики схожести с реальными отзывами"
+    with st.expander(expander_text, expanded=False):
+        if not reviews:
+            st.info("Реальные отзывы не использовались при генерации.")
+        else:
+            # Create DataFrame for metrics table
+            data = []
+            for i, (review_text, metric) in enumerate(zip(reviews, metrics), 1):
+                data.append({
+                    'Номер': f'Отзыв {i}',
+                    'Текст': review_text,
+                    'BLEU': metric['bleu'],
+                    'ROUGE': metric['rouge'],
+                    'semantic': metric['semantic'],
+                    'combined': metric['combined']
+                })
+            
+            # Calculate averages for all metrics
+            avg_bleu = np.mean([m['bleu'] for m in metrics])
+            avg_rouge = np.mean([m['rouge'] for m in metrics])
+            avg_semantic = np.mean([m['semantic'] for m in metrics])
+            avg_combined = np.mean([m['combined'] for m in metrics])
+            
+            # Add average row
+            data.append({
+                'Номер': 'Среднее',
+                'Текст': '',
+                'BLEU': round(avg_bleu, 3),
+                'ROUGE': round(avg_rouge, 3),
+                'semantic': round(avg_semantic, 3),
+                'combined': round(avg_combined, 3)
+            })
+            
+            df = pd.DataFrame(data)
+            st.dataframe(
+                df,
+                column_config={
+                    'Номер': st.column_config.TextColumn('№'),
+                    'Текст': st.column_config.TextColumn('Текст отзыва'),
+                    'BLEU': st.column_config.NumberColumn(
+                        'BLEU Score',
+                        help='Оценка схожести на основе n-грамм'
+                    ),
+                    'ROUGE': st.column_config.NumberColumn(
+                        'ROUGE Score',
+                        help='Оценка схожести на основе перекрытия слов'
+                    ),
+                    'semantic': st.column_config.NumberColumn(
+                        'Semantic Score',
+                        help='Оценка семантической схожести'
+                    ),
+                    'combined': st.column_config.NumberColumn(
+                        'Combined Score',
+                        help='Общая оценка схожести'
+                    )
+                },
+                hide_index=True
+            )
 
 
 # Page configuration
@@ -232,6 +234,7 @@ st.markdown("""
     }
 
     /* Card styling */
+    .card {
         background-color: #1e2227;
         padding: 2rem;
         border-radius: 10px;
@@ -391,7 +394,7 @@ st.markdown(
 )
 
 # Input fields with larger labels
-col1, col2 = st.columns([3, 1])
+col1, col2, col3 = st.columns([2, 1, 1])
 
 with col1:
     st.markdown(
@@ -427,6 +430,25 @@ with col2:
     )
     st.markdown(f"{'⭐' * int(rating)}")
 
+with col3:
+    st.markdown('<p class="big-font">Модель для сравнения:</p>', unsafe_allow_html=True)
+    # Filter out the default model from available models
+    comparison_models = {k: v for k, v in AVAILABLE_MODELS.items() if k != DEFAULT_MODEL}
+    if 'selected_model' not in st.session_state:
+        st.session_state.selected_model = list(comparison_models.keys())[0]
+    
+    selected_model = st.selectbox(
+        "Модель для сравнения",
+        options=list(comparison_models.keys()),
+        format_func=lambda x: comparison_models[x],
+        key="model_select",
+        label_visibility="collapsed"
+    )
+    
+    if selected_model != st.session_state.selected_model:
+        st.session_state.selected_model = selected_model
+        st.session_state.review_generator_2 = ReviewGenerator(selected_model)
+
 # Generate button with padding
 st.markdown("<div style='padding: 1.5rem 0;'>", unsafe_allow_html=True)
 generate = st.button("Сгенерировать!", use_container_width=True)
@@ -454,7 +476,7 @@ if generate:
                 st.info(msg)
 
             # Proceed with generation
-            generate_review(theme, rating, category, reviews)
+            generate_review_comparison(theme, rating, category, reviews)
 
 # Logs section at the bottom
 st.markdown('<div class="card">', unsafe_allow_html=True)

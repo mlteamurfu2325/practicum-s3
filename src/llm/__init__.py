@@ -12,7 +12,7 @@ import json
 from src.config import (
     OPENROUTER_API_KEY,
     OPENROUTER_BASE_URL,
-    MODEL_NAME,
+    DEFAULT_MODEL,
     ERROR_MESSAGES,
     QUALITY_THRESHOLD
 )
@@ -89,14 +89,15 @@ def parse_json_response(content: str, step: str) -> Dict:
 class ReviewGenerator:
     """Main class for generating reviews using LLM."""
 
-    def __init__(self):
+    def __init__(self, model_name=None):
         """Initialize the review generator with OpenRouter client."""
-        logger.info("Initializing ReviewGenerator")
+        logger.info(f"Initializing ReviewGenerator with model: {model_name}")
         self.client = OpenAI(
             base_url=OPENROUTER_BASE_URL,
             api_key=OPENROUTER_API_KEY,
             default_headers={"HTTP-Referer": "http://localhost:8501"}
         )
+        self.model_name = model_name or DEFAULT_MODEL
         self.workflow = self._create_workflow()
         logger.info("ReviewGenerator initialized successfully")
 
@@ -111,7 +112,7 @@ class ReviewGenerator:
             """Validate user input."""
             logger.info(f"Validating input theme: {state['theme']}")
             response = self.client.chat.completions.create(
-                model=MODEL_NAME,
+                model=self.model_name,
                 messages=[{
                     "role": "user",
                     "content": VALIDATION_PROMPT.format(
@@ -132,7 +133,7 @@ class ReviewGenerator:
                 f"rating={state['rating']}, category='{state['category']}'"
             )
             response = self.client.chat.completions.create(
-                model=MODEL_NAME,
+                model=self.model_name,
                 messages=[{
                     "role": "user",
                     "content": GENERATION_PROMPT.format(
@@ -152,7 +153,7 @@ class ReviewGenerator:
             """Perform self-check of generated review."""
             logger.info("Performing quality check on generated review")
             response = self.client.chat.completions.create(
-                model=MODEL_NAME,
+                model=self.model_name,
                 messages=[{
                     "role": "user",
                     "content": SELF_CHECK_PROMPT.format(
