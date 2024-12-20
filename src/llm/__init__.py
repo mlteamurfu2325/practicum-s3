@@ -4,6 +4,7 @@ from typing_extensions import TypedDict
 import logging
 import sys
 import re
+import streamlit as st
 
 from langgraph.graph import StateGraph
 from openai import OpenAI
@@ -22,14 +23,51 @@ from src.llm.prompts import (
     SELF_CHECK_PROMPT
 )
 
+
+class SessionStateHandler(logging.Handler):
+    """Custom logging handler that stores logs in session state."""
+    
+    def __init__(self, model_num=1):
+        super().__init__()
+        self.model_num = model_num
+
+    def emit(self, record):
+        log_entry = self.format(record)
+        if self.model_num == 1:
+            st.session_state.app_logs_1.append(log_entry)
+            if len(st.session_state.app_logs_1) > 50:
+                st.session_state.app_logs_1.pop(0)
+        else:
+            st.session_state.app_logs_2.append(log_entry)
+            if len(st.session_state.app_logs_2) > 50:
+                st.session_state.app_logs_2.pop(0)
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     stream=sys.stdout
 )
+
+# Create loggers for each model
 logger1 = logging.getLogger('model1')
+logger1.propagate = False  # Prevent propagation to root logger
+logger1.setLevel(logging.INFO)
+handler1 = SessionStateHandler(model_num=1)
+handler1.setFormatter(
+    logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+)
+logger1.addHandler(handler1)
+
 logger2 = logging.getLogger('model2')
+logger2.propagate = False  # Prevent propagation to root logger
+logger2.setLevel(logging.INFO)
+handler2 = SessionStateHandler(model_num=2)
+handler2.setFormatter(
+    logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+)
+logger2.addHandler(handler2)
 
 
 class ReviewState(TypedDict):
