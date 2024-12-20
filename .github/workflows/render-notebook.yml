@@ -30,8 +30,10 @@ jobs:
           jupytext --to notebook eda/yandex-reviews-eda.py
           
           # Execute the notebook
-          jupyter nbconvert --to notebook --execute eda/yandex-reviews-eda.ipynb --output executed-notebook.ipynb
-          mv executed-notebook.ipynb eda/yandex-reviews-eda.ipynb
+          cd eda
+          jupyter nbconvert --to notebook --execute yandex-reviews-eda.ipynb --output executed-notebook.ipynb
+          mv executed-notebook.ipynb yandex-reviews-eda.ipynb
+          cd ..
 
       - name: Configure Git
         run: |
