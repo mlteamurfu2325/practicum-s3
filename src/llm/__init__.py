@@ -36,11 +36,13 @@ class SessionStateHandler(logging.Handler):
         # Format timestamp
         timestamp = datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S,%03d')
         
-        # Format HTTP requests differently
-        if record.msg.startswith('HTTP Request:'):
-            log_entry = f"{timestamp} - [INFO] {record.msg}"
+        # Format message
+        if record.msg.startswith('['):
+            # Message already contains level info, just add timestamp
+            log_entry = f"{timestamp} {record.msg}"
         else:
-            log_entry = self.format(record)
+            # Add timestamp and level
+            log_entry = f"{timestamp} - [{record.levelname}] {record.msg}"
             
         if self.model_num == 1:
             st.session_state.app_logs_1.append(log_entry)
@@ -52,17 +54,22 @@ class SessionStateHandler(logging.Handler):
                 st.session_state.app_logs_2.pop(0)
 
 
-# Configure root logger
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     stream=sys.stdout
 )
 
+# Remove all handlers from root logger
+root = logging.getLogger()
+for handler in root.handlers[:]:
+    root.removeHandler(handler)
+
 # Create loggers for each model
 logger1 = logging.getLogger('model1')
-logger1.propagate = False
 logger1.setLevel(logging.INFO)
+logger1.propagate = False
 handler1 = SessionStateHandler(model_num=1)
 handler1.setFormatter(
     logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -70,13 +77,20 @@ handler1.setFormatter(
 logger1.addHandler(handler1)
 
 logger2 = logging.getLogger('model2')
-logger2.propagate = False
 logger2.setLevel(logging.INFO)
+logger2.propagate = False
 handler2 = SessionStateHandler(model_num=2)
 handler2.setFormatter(
     logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 )
 logger2.addHandler(handler2)
+
+# Add console handler for debugging
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(
+    logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+)
+root.addHandler(console_handler)
 
 
 class ReviewState(TypedDict):

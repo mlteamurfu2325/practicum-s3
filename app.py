@@ -506,29 +506,11 @@ with st.expander("📋 Логи генерации отзывов", expanded=Fal
         else:
             st.markdown('<div class="log-container">', unsafe_allow_html=True)
             for log in reversed(st.session_state.app_logs_1):
-                try:
-                    # Expected format: 2024-01-01 12:34:56,789 [LEVEL] Message
-                    timestamp = log[:23]
-                    level_start = log.find('[') + 1
-                    level_end = log.find(']')
-                    level = log[level_start:level_end]
-                    message = log[level_end + 2:].strip()
-                    
-                    # Format log entry with HTML
-                    st.markdown(
-                        f'<div class="log-entry">'
-                        f'<span class="log-timestamp">{timestamp}</span>'
-                        f'<span class="log-level-{level}">[{level}]</span> '
-                        f'{message}'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                except:
-                    # Fallback for any malformed logs
-                    st.markdown(
-                        f'<div class="log-entry">{log.strip()}</div>',
-                        unsafe_allow_html=True
-                    )
+                # Format log entry with HTML
+                st.markdown(
+                    f'<div class="log-entry">{log}</div>',
+                    unsafe_allow_html=True
+                )
             st.markdown('</div>', unsafe_allow_html=True)
     
     with log_col2:
@@ -541,29 +523,11 @@ with st.expander("📋 Логи генерации отзывов", expanded=Fal
         else:
             st.markdown('<div class="log-container">', unsafe_allow_html=True)
             for log in reversed(st.session_state.app_logs_2):
-                try:
-                    # Expected format: 2024-01-01 12:34:56,789 [LEVEL] Message
-                    timestamp = log[:23]
-                    level_start = log.find('[') + 1
-                    level_end = log.find(']')
-                    level = log[level_start:level_end]
-                    message = log[level_end + 2:].strip()
-                    
-                    # Format log entry with HTML
-                    st.markdown(
-                        f'<div class="log-entry">'
-                        f'<span class="log-timestamp">{timestamp}</span>'
-                        f'<span class="log-level-{level}">[{level}]</span> '
-                        f'{message}'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                except:
-                    # Fallback for any malformed logs
-                    st.markdown(
-                        f'<div class="log-entry">{log.strip()}</div>',
-                        unsafe_allow_html=True
-                    )
+                # Format log entry with HTML
+                st.markdown(
+                    f'<div class="log-entry">{log}</div>',
+                    unsafe_allow_html=True
+                )
             st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
