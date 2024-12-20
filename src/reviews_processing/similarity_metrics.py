@@ -48,16 +48,22 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
     Returns:
         List of dictionaries containing similarity scores for each reference review
     """
-    def tokenize_for_rouge(text: str) -> List[str]:
-        """Tokenize text for ROUGE scoring."""
-        doc = nlp(text.lower())
-        return [token.text for token in doc if not token.is_punct and not token.is_space]
+    class RussianTokenizer:
+        """Tokenizer class for ROUGE scoring with Russian language support."""
+        def __init__(self, nlp):
+            self.nlp = nlp
+
+        def tokenize(self, text: str) -> List[str]:
+            """Tokenize text using spaCy's Russian model."""
+            doc = self.nlp(text.lower())
+            return [token.text for token in doc if not token.is_punct and not token.is_space]
 
     # Initialize ROUGE scorer with Russian-specific settings
+    tokenizer = RussianTokenizer(nlp)
     scorer = rouge_scorer.RougeScorer(
         ['rouge1', 'rouge2', 'rougeL'],
         use_stemmer=True,
-        tokenizer=tokenize_for_rouge
+        tokenizer=tokenizer
     )
     
     # Initialize BLEU smoothing with more lenient method
