@@ -25,15 +25,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-eda.txt
+          pip install jupytext nbconvert jupyter
 
-      - name: Download dataset and prepare files
+      - name: Download dataset
         run: |
           # Create data directory
           mkdir -p data
           
           # Download dataset
           wget -O data/geo-reviews-dataset-2023.tskv https://github.com/yandex/geo-reviews-dataset-2023/raw/refs/heads/master/geo-reviews-dataset-2023.tskv
-          
+
+      - name: Convert and execute notebook
+        run: |
           # Convert .py to .ipynb
           jupytext --to notebook eda/yandex-reviews-eda.py
           
@@ -43,21 +46,25 @@ jobs:
           mv executed-notebook.ipynb yandex-reviews-eda.ipynb
           cd ..
 
-      - name: Configure Git
-        run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@github.com"
-
       - name: Save notebook files
         run: |
           # Create temp directory and save files
           mkdir -p /tmp/notebook-files/eda
           cp eda/yandex-reviews-eda.py eda/yandex-reviews-eda.ipynb /tmp/notebook-files/eda/
+          
+          # Stage and commit generated files in main branch
+          git add eda/yandex-reviews-eda.ipynb
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions Bot"
+          git commit -m "chore: add generated notebook [skip ci]" || echo "No changes to commit"
 
       - name: Create or switch to gh-pages branch
         run: |
+          # Clean untracked files to prevent conflicts
+          git clean -fd
+          
           if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
-            git checkout gh-pages
+            git checkout gh-pages || (git stash && git checkout gh-pages)
           else
             git checkout --orphan gh-pages
             git rm -rf .
