@@ -9,16 +9,21 @@ import numpy as np
 # Download required NLTK data
 def ensure_nltk_data():
     """Ensure all required NLTK data is downloaded."""
-    required_data = {
-        'tokenizers/punkt': 'punkt',
-        'taggers/averaged_perceptron_tagger': 'averaged_perceptron_tagger',
-        'tokenizers/perluniprops': 'perluniprops'
-    }
-    for path, package in required_data.items():
+    try:
+        # Download punkt if not available
         try:
-            nltk.data.find(path)
+            nltk.data.find('tokenizers/punkt')
         except LookupError:
-            nltk.download(package, quiet=True)
+            nltk.download('punkt', quiet=True)
+        
+        # Ensure Russian language support
+        try:
+            nltk.data.find('tokenizers/punkt/russian.pickle')
+        except LookupError:
+            # If Russian model doesn't exist, download punkt again to get all languages
+            nltk.download('punkt', quiet=True)
+    except Exception as e:
+        print(f"Error downloading NLTK data: {str(e)}")
 
 # Initialize NLTK data
 ensure_nltk_data()
@@ -46,9 +51,9 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
     metrics = []
     
     for ref_review in reference_reviews:
-        # Calculate BLEU score
-        ref_tokens = nltk.word_tokenize(ref_review.lower())
-        gen_tokens = nltk.word_tokenize(generated_review.lower())
+        # Calculate BLEU score with Russian tokenization
+        ref_tokens = nltk.word_tokenize(ref_review.lower(), language='russian')
+        gen_tokens = nltk.word_tokenize(generated_review.lower(), language='russian')
         bleu_score = sentence_bleu([ref_tokens], gen_tokens, smoothing_function=smoothing)
         
         # Calculate ROUGE scores
