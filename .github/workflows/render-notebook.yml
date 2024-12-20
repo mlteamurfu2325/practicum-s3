@@ -24,8 +24,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-eda.txt
 
-      - name: Convert and execute notebook
+      - name: Download dataset and prepare files
         run: |
+          # Create data directory
+          mkdir -p data
+          
+          # Download dataset
+          wget -O data/geo-reviews-dataset-2023.tskv https://github.com/yandex/geo-reviews-dataset-2023/raw/refs/heads/master/geo-reviews-dataset-2023.tskv
+          
           # Convert .py to .ipynb
           jupytext --to notebook eda/yandex-reviews-eda.py
           
@@ -54,11 +60,11 @@ jobs:
           # Create necessary directories
           mkdir -p data eda
           
-          # Copy files from main branch
-          git checkout main -- data/* eda/yandex-reviews-eda.py eda/yandex-reviews-eda.ipynb
+          # Copy only notebook files (exclude data files)
+          cp eda/yandex-reviews-eda.py eda/yandex-reviews-eda.ipynb .
           
-          # Stage changes
-          git add data/* eda/yandex-reviews-eda.py eda/yandex-reviews-eda.ipynb
+          # Stage changes (exclude *.tskv and large files)
+          git add eda/yandex-reviews-eda.py eda/yandex-reviews-eda.ipynb
 
       - name: Commit and push changes
         run: |
