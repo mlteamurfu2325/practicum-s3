@@ -1,10 +1,12 @@
 import streamlit as st
 from src.llm import ReviewGenerator
 from src.db.db_connection import get_unique_rubrics, get_relevant_reviews
+from src.reviews_processing.similarity_metrics import calculate_metrics, calculate_average_scores
 import time
 import logging
 from datetime import datetime
 import os
+import pandas as pd
 from dotenv import load_dotenv
 
 
@@ -121,14 +123,45 @@ def generate_review(theme, rating, category, reviews):
             label_visibility="collapsed"
         )
 
+        # Calculate similarity metrics
+        metrics = calculate_metrics(review, reviews) if reviews else []
+        avg_scores = calculate_average_scores(metrics)
+        
         expander_text = (
-            "📚 Показать реальные отзывы, использованные для вдохновения"
+            "📊 Метрики схожести с реальными отзывами"
         )
         with st.expander(expander_text, expanded=False):
-            for i, review in enumerate(reviews, 1):
-                st.markdown(f"**Отзыв {i}:**")
-                st.text(review)
-                st.markdown("---")
+            if not reviews:
+                st.info("Реальные отзывы не использовались при генерации.")
+            else:
+                # Create DataFrame for metrics table
+                data = []
+                for i, (review_text, metric) in enumerate(zip(reviews, metrics), 1):
+                    data.append({
+                        'Номер': f'Отзыв {i}',
+                        'Текст': review_text,
+                        'BLEU': f"{metric['bleu']:.3f}",
+                        'ROUGE': f"{metric['rouge']:.3f}"
+                    })
+                # Add average row
+                data.append({
+                    'Номер': 'Среднее',
+                    'Текст': '',
+                    'BLEU': f"{avg_scores['bleu']:.3f}",
+                    'ROUGE': f"{avg_scores['rouge']:.3f}"
+                })
+                
+                df = pd.DataFrame(data)
+                st.dataframe(
+                    df,
+                    column_config={
+                        'Номер': st.column_config.TextColumn('№'),
+                        'Текст': st.column_config.TextColumn('Текст отзыва'),
+                        'BLEU': st.column_config.NumberColumn('BLEU Score'),
+                        'ROUGE': st.column_config.NumberColumn('ROUGE Score')
+                    },
+                    hide_index=True
+                )
 
         st.markdown('</div>', unsafe_allow_html=True)
 

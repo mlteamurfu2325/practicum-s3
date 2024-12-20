@@ -20,6 +20,8 @@ tqdm
 transformers
 sentence-transformers
 torch
+nltk
+rouge-score
 
 # Database
 pgvector
