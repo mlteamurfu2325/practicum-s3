@@ -189,16 +189,16 @@ def generate_review(theme, rating, category, reviews):
                     hide_index=True
                 )
                 
-                # Add explanation of metrics
-                with st.expander("ℹ️ О метриках схожести"):
-                    st.markdown("""
-                    - **BLEU Score**: Оценивает схожесть на основе совпадения последовательностей слов
-                    - **ROUGE Score**: Оценивает перекрытие слов между отзывами
-                    - **Semantic Score**: Оценивает семантическую близость текстов
-                    - **Combined Score**: Взвешенная комбинация всех метрик
-                    
-                    Все оценки находятся в диапазоне от 0 до 1, где 1 означает полное совпадение.
-                    """)
+                # Add explanation of metrics below the table
+                st.markdown("""
+                ### ℹ️ О метриках схожести:
+                - **BLEU Score**: Оценивает схожесть на основе совпадения последовательностей слов
+                - **ROUGE Score**: Оценивает перекрытие слов между отзывами
+                - **Semantic Score**: Оценивает семантическую близость текстов
+                - **Combined Score**: Взвешенная комбинация всех метрик
+                
+                Все оценки находятся в диапазоне от 0 до 1, где 1 означает полное совпадение.
+                """)
 
         st.markdown('</div>', unsafe_allow_html=True)
 
