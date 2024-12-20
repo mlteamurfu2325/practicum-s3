@@ -37,6 +37,24 @@ def tokenize_text(text: str, nlp: Language) -> List[str]:
     # Use lemmatization for better matching
     return [token.lemma_ for token in doc if not token.is_punct and not token.is_space]
 
+class RussianTokenizer:
+    """Tokenizer class for ROUGE scoring with Russian language support."""
+    def __init__(self, nlp):
+        self.nlp = nlp
+
+    def tokenize(self, text: str) -> List[str]:
+        """Tokenize text using spaCy's Russian model."""
+        doc = self.nlp(text.lower())
+        return [token.text for token in doc if not token.is_punct and not token.is_space]
+
+# Initialize tokenizer and scorer globally
+russian_tokenizer = RussianTokenizer(nlp)
+rouge_scorer_instance = rouge_scorer.RougeScorer(
+    ['rouge1', 'rouge2', 'rougeL'],
+    use_stemmer=True,
+    tokenizer=russian_tokenizer
+)
+
 def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> List[Dict[str, float]]:
     """
     Calculate similarity scores between generated review and reference reviews.
@@ -48,23 +66,6 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
     Returns:
         List of dictionaries containing similarity scores for each reference review
     """
-    class RussianTokenizer:
-        """Tokenizer class for ROUGE scoring with Russian language support."""
-        def __init__(self, nlp):
-            self.nlp = nlp
-
-        def tokenize(self, text: str) -> List[str]:
-            """Tokenize text using spaCy's Russian model."""
-            doc = self.nlp(text.lower())
-            return [token.text for token in doc if not token.is_punct and not token.is_space]
-
-    # Initialize ROUGE scorer with Russian-specific settings
-    tokenizer = RussianTokenizer(nlp)
-    scorer = rouge_scorer.RougeScorer(
-        ['rouge1', 'rouge2', 'rougeL'],
-        use_stemmer=True,
-        tokenizer=tokenizer
-    )
     
     # Initialize BLEU smoothing with more lenient method
     smoothing = SmoothingFunction().method4  # method4 is more suitable for short texts
@@ -92,8 +93,8 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
             smoothing_function=smoothing
         )
         
-        # Calculate ROUGE scores
-        rouge_scores = scorer.score(generated_review, ref_review)
+        # Calculate ROUGE scores using global scorer
+        rouge_scores = rouge_scorer_instance.score(generated_review, ref_review)
         
         # Calculate semantic similarity using spaCy
         semantic_sim = gen_doc.similarity(ref_doc)
