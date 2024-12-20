@@ -14,13 +14,26 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Initialize logs in session state if not exists
+if 'app_logs' not in st.session_state:
+    st.session_state.app_logs = []
+
+# Custom logging handler that stores logs in session state
+class SessionStateHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = self.format(record)
+        st.session_state.app_logs.append(log_entry)
+        # Keep only last 50 logs
+        if len(st.session_state.app_logs) > 50:
+            st.session_state.app_logs.pop(0)
+
 # Set up logging
-os.makedirs('logs', exist_ok=True)
-logging.basicConfig(
-    filename=f'logs/app-{datetime.now():%Y-%m-%d}.log',
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s'
+handler = SessionStateHandler()
+handler.setFormatter(
+    logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 )
+logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().addHandler(handler)
 
 
 # Rate limiting implementation
@@ -319,6 +332,44 @@ st.markdown("""
         font-size: 1.3rem !important;
         font-weight: 500;
     }
+
+    /* Logs styling */
+    .log-container {
+        background-color: #1a1c21;
+        border: 1px solid #2e3238;
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: 'Courier New', monospace;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .log-entry {
+        padding: 0.5rem;
+        border-bottom: 1px solid #2e3238;
+        font-size: 0.9rem;
+    }
+
+    .log-entry:last-child {
+        border-bottom: none;
+    }
+
+    .log-timestamp {
+        color: #888;
+        margin-right: 1rem;
+    }
+
+    .log-level-INFO {
+        color: #4CAF50;
+    }
+
+    .log-level-WARNING {
+        color: #FFC107;
+    }
+
+    .log-level-ERROR {
+        color: #f44336;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -404,3 +455,39 @@ if generate:
 
             # Proceed with generation
             generate_review(theme, rating, category, reviews)
+
+# Logs section at the bottom
+st.markdown('<div class="card">', unsafe_allow_html=True)
+with st.expander("📋 Логи генерации отзывов", expanded=False):
+    if not st.session_state.app_logs:
+        st.info("Нет доступных логов")
+    else:
+        # Display logs in reverse chronological order with pretty formatting
+        st.markdown('<div class="log-container">', unsafe_allow_html=True)
+        for log in reversed(st.session_state.app_logs):
+            try:
+                # Expected format: 2024-01-01 12:34:56,789 [LEVEL] Message
+                timestamp = log[:23]
+                level_start = log.find('[') + 1
+                level_end = log.find(']')
+                level = log[level_start:level_end]
+                message = log[level_end + 2:].strip()
+                
+                # Format log entry with HTML
+                st.markdown(
+                    f'<div class="log-entry">'
+                    f'<span class="log-timestamp">{timestamp}</span>'
+                    f'<span class="log-level-{level}">[{level}]</span> '
+                    f'{message}'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            except:
+                # Fallback for any malformed logs
+                st.markdown(
+                    f'<div class="log-entry">{log.strip()}</div>',
+                    unsafe_allow_html=True
+                )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
