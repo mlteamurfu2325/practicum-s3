@@ -46,6 +46,12 @@ jobs:
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@github.com"
 
+      - name: Save notebook files
+        run: |
+          # Create temp directory and save files
+          mkdir -p /tmp/notebook-files/eda
+          cp eda/yandex-reviews-eda.py eda/yandex-reviews-eda.ipynb /tmp/notebook-files/eda/
+
       - name: Create or switch to gh-pages branch
         run: |
           if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
@@ -58,10 +64,10 @@ jobs:
       - name: Copy files to gh-pages
         run: |
           # Create necessary directories
-          mkdir -p data eda
+          mkdir -p eda
           
-          # Copy only notebook files (exclude data files)
-          cp eda/yandex-reviews-eda.py eda/yandex-reviews-eda.ipynb .
+          # Copy files from temp directory
+          cp -r /tmp/notebook-files/eda/* eda/
           
           # Stage changes (exclude *.tskv and large files)
           git add eda/yandex-reviews-eda.py eda/yandex-reviews-eda.ipynb
