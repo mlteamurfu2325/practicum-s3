@@ -7,10 +7,21 @@ from typing import List, Dict, Tuple
 import numpy as np
 
 # Download required NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
+def ensure_nltk_data():
+    """Ensure all required NLTK data is downloaded."""
+    required_data = {
+        'tokenizers/punkt': 'punkt',
+        'taggers/averaged_perceptron_tagger': 'averaged_perceptron_tagger',
+        'tokenizers/perluniprops': 'perluniprops'
+    }
+    for path, package in required_data.items():
+        try:
+            nltk.data.find(path)
+        except LookupError:
+            nltk.download(package, quiet=True)
+
+# Initialize NLTK data
+ensure_nltk_data()
 
 
 def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> List[Dict[str, float]]:
@@ -24,6 +35,8 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
     Returns:
         List of dictionaries containing BLEU and ROUGE scores for each reference review
     """
+    # Ensure NLTK data is available
+    ensure_nltk_data()
     # Initialize ROUGE scorer
     scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
     
