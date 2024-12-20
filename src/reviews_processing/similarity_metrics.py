@@ -39,44 +39,73 @@ def tokenize_text(text: str, nlp: Language) -> List[str]:
 
 def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> List[Dict[str, float]]:
     """
-    Calculate BLEU and ROUGE scores between generated review and reference reviews.
+    Calculate similarity scores between generated review and reference reviews.
     
     Args:
         generated_review: The AI-generated review
         reference_reviews: List of real reviews used as reference
         
     Returns:
-        List of dictionaries containing BLEU and ROUGE scores for each reference review
+        List of dictionaries containing similarity scores for each reference review
     """
-    # Initialize ROUGE scorer with stemming for Russian
-    scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+    # Initialize ROUGE scorer with Russian-specific settings
+    scorer = rouge_scorer.RougeScorer(
+        ['rouge1', 'rouge2', 'rougeL'],
+        use_stemmer=True,
+        tokenizer=lambda x: [token.text for token in nlp(x) if not token.is_punct and not token.is_space]
+    )
     
-    # Initialize BLEU smoothing
-    smoothing = SmoothingFunction().method1
+    # Initialize BLEU smoothing with more lenient method
+    smoothing = SmoothingFunction().method4  # method4 is more suitable for short texts
     
     metrics = []
+    gen_doc = nlp(generated_review.lower())
     
-    # Tokenize generated review once
-    gen_tokens = tokenize_text(generated_review, nlp)
+    # Get content words from generated review (excluding stopwords and punctuation)
+    gen_tokens = [token.lemma_ for token in gen_doc 
+                 if not token.is_punct and not token.is_space and not token.is_stop]
     
     for ref_review in reference_reviews:
-        # Calculate BLEU score with spaCy tokenization
-        ref_tokens = tokenize_text(ref_review, nlp)
-        bleu_score = sentence_bleu([ref_tokens], gen_tokens, smoothing_function=smoothing)
+        ref_doc = nlp(ref_review.lower())
+        
+        # Get content words from reference review
+        ref_tokens = [token.lemma_ for token in ref_doc 
+                     if not token.is_punct and not token.is_space and not token.is_stop]
+        
+        # Calculate BLEU score with multiple n-gram weights
+        weights = (0.4, 0.3, 0.2, 0.1)  # Give more weight to unigrams and bigrams
+        bleu_score = sentence_bleu(
+            [ref_tokens],
+            gen_tokens,
+            weights=weights,
+            smoothing_function=smoothing
+        )
         
         # Calculate ROUGE scores
         rouge_scores = scorer.score(generated_review, ref_review)
         
-        # Average of ROUGE scores for simplicity
+        # Calculate semantic similarity using spaCy
+        semantic_sim = gen_doc.similarity(ref_doc)
+        
+        # Combine ROUGE scores with weights
         rouge_avg = np.mean([
-            rouge_scores['rouge1'].fmeasure,
-            rouge_scores['rouge2'].fmeasure,
-            rouge_scores['rougeL'].fmeasure
+            rouge_scores['rouge1'].fmeasure * 0.4,  # More weight to unigrams
+            rouge_scores['rouge2'].fmeasure * 0.3,  # Less weight to bigrams
+            rouge_scores['rougeL'].fmeasure * 0.3   # Less weight to longest common subsequence
+        ])
+        
+        # Combine different metrics
+        final_score = np.mean([
+            bleu_score * 0.3,      # 30% weight to BLEU
+            rouge_avg * 0.3,       # 30% weight to ROUGE
+            semantic_sim * 0.4     # 40% weight to semantic similarity
         ])
         
         metrics.append({
             'bleu': round(bleu_score, 3),
-            'rouge': round(rouge_avg, 3)
+            'rouge': round(rouge_avg, 3),
+            'semantic': round(semantic_sim, 3),
+            'combined': round(final_score, 3)
         })
     
     return metrics
