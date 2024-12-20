@@ -15,27 +15,6 @@ from src.config import AVAILABLE_MODELS, DEFAULT_MODEL
 # Load environment variables
 load_dotenv()
 
-# Initialize logs in session state if not exists
-if 'app_logs' not in st.session_state:
-    st.session_state.app_logs = []
-
-# Initialize rate limiter in session state
-if 'rate_limiter' not in st.session_state:
-    max_requests = int(os.getenv('MAX_REQUESTS_PER_HOUR', '100'))
-    timeout = int(os.getenv('TIMEOUT_SECONDS', '15'))
-    st.session_state.rate_limiter = RateLimiter(
-        max_requests=max_requests,
-        window_seconds=3600
-    )
-
-# Initialize ReviewGenerators in session state if not exists
-if 'review_generator_1' not in st.session_state:
-    st.session_state.review_generator_1 = ReviewGenerator(DEFAULT_MODEL)
-
-if 'review_generator_2' not in st.session_state:
-    st.session_state.review_generator_2 = ReviewGenerator(DEFAULT_MODEL)
-
-
 # Rate limiting implementation
 class RateLimiter:
     def __init__(self, max_requests=100, window_seconds=3600):
@@ -63,6 +42,27 @@ class RateLimiter:
 
         self.requests[ip].append(now)
         return True
+
+
+# Initialize logs in session state if not exists
+if 'app_logs' not in st.session_state:
+    st.session_state.app_logs = []
+
+# Initialize rate limiter in session state
+if 'rate_limiter' not in st.session_state:
+    max_requests = int(os.getenv('MAX_REQUESTS_PER_HOUR', '100'))
+    timeout = int(os.getenv('TIMEOUT_SECONDS', '15'))
+    st.session_state.rate_limiter = RateLimiter(
+        max_requests=max_requests,
+        window_seconds=3600
+    )
+
+# Initialize ReviewGenerators in session state if not exists
+if 'review_generator_1' not in st.session_state:
+    st.session_state.review_generator_1 = ReviewGenerator(DEFAULT_MODEL)
+
+if 'review_generator_2' not in st.session_state:
+    st.session_state.review_generator_2 = ReviewGenerator(DEFAULT_MODEL)
 
 
 def generate_review_comparison(theme, rating, category, reviews):
