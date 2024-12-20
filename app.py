@@ -1,10 +1,13 @@
 import streamlit as st
 from src.llm import ReviewGenerator
 from src.db.db_connection import get_unique_rubrics, get_relevant_reviews
+from src.reviews_processing.similarity_metrics import calculate_metrics, calculate_average_scores
 import time
 import logging
 from datetime import datetime
 import os
+import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 
 
@@ -121,14 +124,81 @@ def generate_review(theme, rating, category, reviews):
             label_visibility="collapsed"
         )
 
+        # Calculate similarity metrics
+        metrics = calculate_metrics(review, reviews) if reviews else []
+        avg_scores = calculate_average_scores(metrics)
+        
         expander_text = (
-            "📚 Показать реальные отзывы, использованные для вдохновения"
+            "📊 Метрики схожести с реальными отзывами"
         )
         with st.expander(expander_text, expanded=False):
-            for i, review in enumerate(reviews, 1):
-                st.markdown(f"**Отзыв {i}:**")
-                st.text(review)
-                st.markdown("---")
+            if not reviews:
+                st.info("Реальные отзывы не использовались при генерации.")
+            else:
+                # Create DataFrame for metrics table
+                data = []
+                for i, (review_text, metric) in enumerate(zip(reviews, metrics), 1):
+                    data.append({
+                        'Номер': f'Отзыв {i}',
+                        'Текст': review_text,
+                        'BLEU': metric['bleu'],
+                        'ROUGE': metric['rouge'],
+                        'semantic': metric['semantic'],
+                        'combined': metric['combined']
+                    })
+                
+                # Calculate averages for all metrics
+                avg_bleu = np.mean([m['bleu'] for m in metrics])
+                avg_rouge = np.mean([m['rouge'] for m in metrics])
+                avg_semantic = np.mean([m['semantic'] for m in metrics])
+                avg_combined = np.mean([m['combined'] for m in metrics])
+                
+                # Add average row
+                data.append({
+                    'Номер': 'Среднее',
+                    'Текст': '',
+                    'BLEU': round(avg_bleu, 3),
+                    'ROUGE': round(avg_rouge, 3),
+                    'semantic': round(avg_semantic, 3),
+                    'combined': round(avg_combined, 3)
+                })
+                
+                df = pd.DataFrame(data)
+                st.dataframe(
+                    df,
+                    column_config={
+                        'Номер': st.column_config.TextColumn('№'),
+                        'Текст': st.column_config.TextColumn('Текст отзыва'),
+                        'BLEU': st.column_config.NumberColumn(
+                            'BLEU Score',
+                            help='Оценка схожести на основе n-грамм'
+                        ),
+                        'ROUGE': st.column_config.NumberColumn(
+                            'ROUGE Score',
+                            help='Оценка схожести на основе перекрытия слов'
+                        ),
+                        'semantic': st.column_config.NumberColumn(
+                            'Semantic Score',
+                            help='Оценка семантической схожести'
+                        ),
+                        'combined': st.column_config.NumberColumn(
+                            'Combined Score',
+                            help='Общая оценка схожести'
+                        )
+                    },
+                    hide_index=True
+                )
+                
+                # Add explanation of metrics below the table
+                st.markdown("""
+                ### ℹ️ О метриках схожести:
+                - **BLEU Score**: Оценивает схожесть на основе совпадения последовательностей слов
+                - **ROUGE Score**: Оценивает перекрытие слов между отзывами
+                - **Semantic Score**: Оценивает семантическую близость текстов
+                - **Combined Score**: Взвешенная комбинация всех метрик
+                
+                Все оценки находятся в диапазоне от 0 до 1, где 1 означает полное совпадение.
+                """)
 
         st.markdown('</div>', unsafe_allow_html=True)
 

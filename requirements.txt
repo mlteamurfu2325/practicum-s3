@@ -20,6 +20,8 @@ tqdm
 transformers
 sentence-transformers
 torch
+spacy>=3.0.0  # For Russian language tokenization
+rouge-score
 
 # Database
 pgvector
