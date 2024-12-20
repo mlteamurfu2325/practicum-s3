@@ -10,20 +10,25 @@ import numpy as np
 def ensure_nltk_data():
     """Ensure all required NLTK data is downloaded."""
     try:
-        # Download punkt if not available
+        # Download punkt_tab for NLTK >= 3.8.2
         try:
-            nltk.data.find('tokenizers/punkt')
+            nltk.data.find('tokenizers/punkt_tab')
         except LookupError:
-            nltk.download('punkt', quiet=True)
-        
-        # Ensure Russian language support
+            nltk.download('punkt_tab', quiet=True)
+            
+        # Verify Russian language support
         try:
-            nltk.data.find('tokenizers/punkt/russian.pickle')
+            nltk.data.find('tokenizers/punkt_tab/russian')
         except LookupError:
-            # If Russian model doesn't exist, download punkt again to get all languages
-            nltk.download('punkt', quiet=True)
+            # If verification fails, try downloading again
+            nltk.download('punkt_tab', quiet=True)
+            
+        if not nltk.data.find('tokenizers/punkt_tab/russian'):
+            raise RuntimeError("Russian language support not available in punkt_tab")
+            
     except Exception as e:
-        print(f"Error downloading NLTK data: {str(e)}")
+        print(f"Error ensuring NLTK data: {str(e)}")
+        print("Please ensure you have NLTK >= 3.8.2 installed")
 
 # Initialize NLTK data
 ensure_nltk_data()

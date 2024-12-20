@@ -20,7 +20,7 @@ tqdm
 transformers
 sentence-transformers
 torch
-nltk
+nltk>=3.8.2  # Required for punkt_tab package
 rouge-score
 
 # Database
