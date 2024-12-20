@@ -32,7 +32,12 @@ class SessionStateHandler(logging.Handler):
         self.model_num = model_num
 
     def emit(self, record):
-        log_entry = self.format(record)
+        # Format HTTP requests differently
+        if record.msg.startswith('HTTP Request:'):
+            log_entry = f"{record.asctime} - [INFO] {record.msg}"
+        else:
+            log_entry = self.format(record)
+            
         if self.model_num == 1:
             st.session_state.app_logs_1.append(log_entry)
             if len(st.session_state.app_logs_1) > 50:
@@ -43,7 +48,7 @@ class SessionStateHandler(logging.Handler):
                 st.session_state.app_logs_2.pop(0)
 
 
-# Configure logging
+# Configure root logger
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -52,7 +57,7 @@ logging.basicConfig(
 
 # Create loggers for each model
 logger1 = logging.getLogger('model1')
-logger1.propagate = False  # Prevent propagation to root logger
+logger1.propagate = False
 logger1.setLevel(logging.INFO)
 handler1 = SessionStateHandler(model_num=1)
 handler1.setFormatter(
@@ -61,7 +66,7 @@ handler1.setFormatter(
 logger1.addHandler(handler1)
 
 logger2 = logging.getLogger('model2')
-logger2.propagate = False  # Prevent propagation to root logger
+logger2.propagate = False
 logger2.setLevel(logging.INFO)
 handler2 = SessionStateHandler(model_num=2)
 handler2.setFormatter(
@@ -135,14 +140,15 @@ class ReviewGenerator:
 
     def __init__(self, model_name=None):
         """Initialize the review generator with OpenRouter client."""
-        self.logger = logger1 if model_name == DEFAULT_MODEL else logger2
-        self.logger.info(f"Initializing ReviewGenerator with model: {model_name}")
+        self.model_name = model_name or DEFAULT_MODEL
+        self.logger = logger1 if self.model_name == DEFAULT_MODEL else logger2
+        
+        self.logger.info(f"Initializing ReviewGenerator with model: {self.model_name}")
         self.client = OpenAI(
             base_url=OPENROUTER_BASE_URL,
             api_key=OPENROUTER_API_KEY,
             default_headers={"HTTP-Referer": "http://localhost:8501"}
         )
-        self.model_name = model_name or DEFAULT_MODEL
         self.json_helper = JsonHelper(self.logger)
         self.workflow = self._create_workflow()
         self.logger.info("ReviewGenerator initialized successfully")
@@ -157,6 +163,7 @@ class ReviewGenerator:
         def validate(state: ReviewState) -> ReviewState:
             """Validate user input."""
             self.logger.info(f"Validating input theme: {state['theme']}")
+            self.logger.info("HTTP Request: POST https://openrouter.ai/api/v1/chat/completions")
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[{
@@ -178,6 +185,7 @@ class ReviewGenerator:
                 f"Generating review for: theme='{state['theme']}', "
                 f"rating={state['rating']}, category='{state['category']}'"
             )
+            self.logger.info("HTTP Request: POST https://openrouter.ai/api/v1/chat/completions")
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[{
@@ -198,6 +206,7 @@ class ReviewGenerator:
         def check(state: ReviewState) -> ReviewState:
             """Perform self-check of generated review."""
             self.logger.info("Performing quality check on generated review")
+            self.logger.info("HTTP Request: POST https://openrouter.ai/api/v1/chat/completions")
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[{
