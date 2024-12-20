@@ -13,7 +13,7 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_MODEL = "google/gemini-flash-1.5"
 AVAILABLE_MODELS = {
     "google/gemini-flash-1.5": "Google Gemini Flash 1.5",
-    "openai/gpt-4-turbo": "GPT-4 Turbo",
+    "openai/gpt-4o-mini": "GPT-4o Mini",
     "amazon/nova-lite-v1": "Amazon Nova Lite"
 }
 
