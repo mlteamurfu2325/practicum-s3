@@ -48,11 +48,16 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
     Returns:
         List of dictionaries containing similarity scores for each reference review
     """
+    def tokenize_for_rouge(text: str) -> List[str]:
+        """Tokenize text for ROUGE scoring."""
+        doc = nlp(text.lower())
+        return [token.text for token in doc if not token.is_punct and not token.is_space]
+
     # Initialize ROUGE scorer with Russian-specific settings
     scorer = rouge_scorer.RougeScorer(
         ['rouge1', 'rouge2', 'rougeL'],
         use_stemmer=True,
-        tokenizer=lambda x: [token.text for token in nlp(x) if not token.is_punct and not token.is_space]
+        tokenizer=tokenize_for_rouge
     )
     
     # Initialize BLEU smoothing with more lenient method
@@ -113,21 +118,30 @@ def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> Li
 
 def calculate_average_scores(metrics: List[Dict[str, float]]) -> Dict[str, float]:
     """
-    Calculate average BLEU and ROUGE scores.
+    Calculate average scores for all metrics.
     
     Args:
-        metrics: List of dictionaries containing BLEU and ROUGE scores
+        metrics: List of dictionaries containing similarity scores
         
     Returns:
         Dictionary with average scores
     """
     if not metrics:
-        return {'bleu': 0.0, 'rouge': 0.0}
+        return {
+            'bleu': 0.0,
+            'rouge': 0.0,
+            'semantic': 0.0,
+            'combined': 0.0
+        }
         
     avg_bleu = np.mean([m['bleu'] for m in metrics])
     avg_rouge = np.mean([m['rouge'] for m in metrics])
+    avg_semantic = np.mean([m['semantic'] for m in metrics])
+    avg_combined = np.mean([m['combined'] for m in metrics])
     
     return {
         'bleu': round(avg_bleu, 3),
-        'rouge': round(avg_rouge, 3)
+        'rouge': round(avg_rouge, 3),
+        'semantic': round(avg_semantic, 3),
+        'combined': round(avg_combined, 3)
     }
