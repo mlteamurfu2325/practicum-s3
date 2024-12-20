@@ -16,40 +16,24 @@ from src.config import AVAILABLE_MODELS, DEFAULT_MODEL
 load_dotenv()
 
 # Initialize logs in session state if not exists
-if 'app_logs_1' not in st.session_state:
-    st.session_state.app_logs_1 = []  # For default model
-if 'app_logs_2' not in st.session_state:
-    st.session_state.app_logs_2 = []  # For comparison model
+if 'app_logs' not in st.session_state:
+    st.session_state.app_logs = []
 
-# Custom logging handler that stores logs in session state
-class SessionStateHandler(logging.Handler):
-    def __init__(self, model_num=1):
-        super().__init__()
-        self.model_num = model_num
+# Initialize rate limiter in session state
+if 'rate_limiter' not in st.session_state:
+    max_requests = int(os.getenv('MAX_REQUESTS_PER_HOUR', '100'))
+    timeout = int(os.getenv('TIMEOUT_SECONDS', '15'))
+    st.session_state.rate_limiter = RateLimiter(
+        max_requests=max_requests,
+        window_seconds=3600
+    )
 
-    def emit(self, record):
-        log_entry = self.format(record)
-        if self.model_num == 1:
-            st.session_state.app_logs_1.append(log_entry)
-            if len(st.session_state.app_logs_1) > 50:
-                st.session_state.app_logs_1.pop(0)
-        else:
-            st.session_state.app_logs_2.append(log_entry)
-            if len(st.session_state.app_logs_2) > 50:
-                st.session_state.app_logs_2.pop(0)
+# Initialize ReviewGenerators in session state if not exists
+if 'review_generator_1' not in st.session_state:
+    st.session_state.review_generator_1 = ReviewGenerator(DEFAULT_MODEL)
 
-# Set up logging for both models
-handler1 = SessionStateHandler(model_num=1)
-handler1.setFormatter(
-    logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-)
-handler2 = SessionStateHandler(model_num=2)
-handler2.setFormatter(
-    logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-)
-logging.getLogger().setLevel(logging.INFO)
-logging.getLogger().addHandler(handler1)
-logging.getLogger().addHandler(handler2)
+if 'review_generator_2' not in st.session_state:
+    st.session_state.review_generator_2 = ReviewGenerator(DEFAULT_MODEL)
 
 
 # Rate limiting implementation
@@ -79,23 +63,6 @@ class RateLimiter:
 
         self.requests[ip].append(now)
         return True
-
-
-# Initialize rate limiter in session state
-if 'rate_limiter' not in st.session_state:
-    max_requests = int(os.getenv('MAX_REQUESTS_PER_HOUR', '100'))
-    timeout = int(os.getenv('TIMEOUT_SECONDS', '15'))
-    st.session_state.rate_limiter = RateLimiter(
-        max_requests=max_requests,
-        window_seconds=3600
-    )
-
-# Initialize ReviewGenerators in session state if not exists
-if 'review_generator_1' not in st.session_state:
-    st.session_state.review_generator_1 = ReviewGenerator(DEFAULT_MODEL)
-
-if 'review_generator_2' not in st.session_state:
-    st.session_state.review_generator_2 = ReviewGenerator(DEFAULT_MODEL)
 
 
 def generate_review_comparison(theme, rating, category, reviews):
@@ -388,6 +355,11 @@ st.markdown("""
     .log-level-ERROR {
         color: #f44336;
     }
+
+    .log-model {
+        color: #00BCD4;
+        margin-right: 1rem;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -496,38 +468,15 @@ if generate:
 # Logs section at the bottom
 st.markdown('<div class="card">', unsafe_allow_html=True)
 with st.expander("📋 Логи генерации отзывов", expanded=False):
-    # Create two columns for logs
-    log_col1, log_col2 = st.columns(2)
-    
-    with log_col1:
-        st.markdown(f'<h3>🤖 {AVAILABLE_MODELS[DEFAULT_MODEL]}</h3>', unsafe_allow_html=True)
-        if not st.session_state.app_logs_1:
-            st.info("Нет доступных логов")
-        else:
-            st.markdown('<div class="log-container">', unsafe_allow_html=True)
-            for log in reversed(st.session_state.app_logs_1):
-                # Format log entry with HTML
-                st.markdown(
-                    f'<div class="log-entry">{log}</div>',
-                    unsafe_allow_html=True
-                )
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    with log_col2:
-        st.markdown(
-            f'<h3>🤖 {AVAILABLE_MODELS[st.session_state.selected_model]}</h3>',
-            unsafe_allow_html=True
-        )
-        if not st.session_state.app_logs_2:
-            st.info("Нет доступных логов")
-        else:
-            st.markdown('<div class="log-container">', unsafe_allow_html=True)
-            for log in reversed(st.session_state.app_logs_2):
-                # Format log entry with HTML
-                st.markdown(
-                    f'<div class="log-entry">{log}</div>',
-                    unsafe_allow_html=True
-                )
-            st.markdown('</div>', unsafe_allow_html=True)
+    if not st.session_state.app_logs:
+        st.info("Нет доступных логов")
+    else:
+        st.markdown('<div class="log-container">', unsafe_allow_html=True)
+        for log in reversed(st.session_state.app_logs):
+            st.markdown(
+                f'<div class="log-entry">{log}</div>',
+                unsafe_allow_html=True
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
