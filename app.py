@@ -319,6 +319,44 @@ st.markdown("""
         font-size: 1.3rem !important;
         font-weight: 500;
     }
+
+    /* Logs styling */
+    .log-container {
+        background-color: #1a1c21;
+        border: 1px solid #2e3238;
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: 'Courier New', monospace;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .log-entry {
+        padding: 0.5rem;
+        border-bottom: 1px solid #2e3238;
+        font-size: 0.9rem;
+    }
+
+    .log-entry:last-child {
+        border-bottom: none;
+    }
+
+    .log-timestamp {
+        color: #888;
+        margin-right: 1rem;
+    }
+
+    .log-level-INFO {
+        color: #4CAF50;
+    }
+
+    .log-level-WARNING {
+        color: #FFC107;
+    }
+
+    .log-level-ERROR {
+        color: #f44336;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -404,3 +442,49 @@ if generate:
 
             # Proceed with generation
             generate_review(theme, rating, category, reviews)
+
+# Logs section at the bottom
+st.markdown('<div class="card">', unsafe_allow_html=True)
+with st.expander("📋 Логи генерации отзывов", expanded=False):
+    try:
+        # Get today's log file
+        log_file = f'logs/app-{datetime.now():%Y-%m-%d}.log'
+        
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                logs = f.readlines()
+            
+            # Display logs in reverse chronological order with pretty formatting
+            st.markdown('<div class="log-container">', unsafe_allow_html=True)
+            for log in reversed(logs[-50:]):  # Show last 50 logs
+                # Parse log entry
+                try:
+                    # Expected format: 2024-01-01 12:34:56,789 [LEVEL] Message
+                    timestamp = log[:23]
+                    level_start = log.find('[') + 1
+                    level_end = log.find(']')
+                    level = log[level_start:level_end]
+                    message = log[level_end + 2:].strip()
+                    
+                    # Format log entry with HTML
+                    st.markdown(
+                        f'<div class="log-entry">'
+                        f'<span class="log-timestamp">{timestamp}</span>'
+                        f'<span class="log-level-{level}">[{level}]</span> '
+                        f'{message}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                except:
+                    # Fallback for any malformed logs
+                    st.markdown(
+                        f'<div class="log-entry">{log.strip()}</div>',
+                        unsafe_allow_html=True
+                    )
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.info("Нет доступных логов за сегодня")
+    except Exception as e:
+        st.error(f"Ошибка при чтении логов: {str(e)}")
+
+st.markdown('</div>', unsafe_allow_html=True)
