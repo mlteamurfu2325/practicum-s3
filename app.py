@@ -16,25 +16,40 @@ from src.config import AVAILABLE_MODELS, DEFAULT_MODEL
 load_dotenv()
 
 # Initialize logs in session state if not exists
-if 'app_logs' not in st.session_state:
-    st.session_state.app_logs = []
+if 'app_logs_1' not in st.session_state:
+    st.session_state.app_logs_1 = []  # For default model
+if 'app_logs_2' not in st.session_state:
+    st.session_state.app_logs_2 = []  # For comparison model
 
 # Custom logging handler that stores logs in session state
 class SessionStateHandler(logging.Handler):
+    def __init__(self, model_num=1):
+        super().__init__()
+        self.model_num = model_num
+
     def emit(self, record):
         log_entry = self.format(record)
-        st.session_state.app_logs.append(log_entry)
-        # Keep only last 50 logs
-        if len(st.session_state.app_logs) > 50:
-            st.session_state.app_logs.pop(0)
+        if self.model_num == 1:
+            st.session_state.app_logs_1.append(log_entry)
+            if len(st.session_state.app_logs_1) > 50:
+                st.session_state.app_logs_1.pop(0)
+        else:
+            st.session_state.app_logs_2.append(log_entry)
+            if len(st.session_state.app_logs_2) > 50:
+                st.session_state.app_logs_2.pop(0)
 
-# Set up logging
-handler = SessionStateHandler()
-handler.setFormatter(
+# Set up logging for both models
+handler1 = SessionStateHandler(model_num=1)
+handler1.setFormatter(
+    logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+)
+handler2 = SessionStateHandler(model_num=2)
+handler2.setFormatter(
     logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 )
 logging.getLogger().setLevel(logging.INFO)
-logging.getLogger().addHandler(handler)
+logging.getLogger().addHandler(handler1)
+logging.getLogger().addHandler(handler2)
 
 
 # Rate limiting implementation
@@ -481,35 +496,74 @@ if generate:
 # Logs section at the bottom
 st.markdown('<div class="card">', unsafe_allow_html=True)
 with st.expander("📋 Логи генерации отзывов", expanded=False):
-    if not st.session_state.app_logs:
-        st.info("Нет доступных логов")
-    else:
-        # Display logs in reverse chronological order with pretty formatting
-        st.markdown('<div class="log-container">', unsafe_allow_html=True)
-        for log in reversed(st.session_state.app_logs):
-            try:
-                # Expected format: 2024-01-01 12:34:56,789 [LEVEL] Message
-                timestamp = log[:23]
-                level_start = log.find('[') + 1
-                level_end = log.find(']')
-                level = log[level_start:level_end]
-                message = log[level_end + 2:].strip()
-                
-                # Format log entry with HTML
-                st.markdown(
-                    f'<div class="log-entry">'
-                    f'<span class="log-timestamp">{timestamp}</span>'
-                    f'<span class="log-level-{level}">[{level}]</span> '
-                    f'{message}'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
-            except:
-                # Fallback for any malformed logs
-                st.markdown(
-                    f'<div class="log-entry">{log.strip()}</div>',
-                    unsafe_allow_html=True
-                )
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Create two columns for logs
+    log_col1, log_col2 = st.columns(2)
+    
+    with log_col1:
+        st.markdown(f'<h3>🤖 {AVAILABLE_MODELS[DEFAULT_MODEL]}</h3>', unsafe_allow_html=True)
+        if not st.session_state.app_logs_1:
+            st.info("Нет доступных логов")
+        else:
+            st.markdown('<div class="log-container">', unsafe_allow_html=True)
+            for log in reversed(st.session_state.app_logs_1):
+                try:
+                    # Expected format: 2024-01-01 12:34:56,789 [LEVEL] Message
+                    timestamp = log[:23]
+                    level_start = log.find('[') + 1
+                    level_end = log.find(']')
+                    level = log[level_start:level_end]
+                    message = log[level_end + 2:].strip()
+                    
+                    # Format log entry with HTML
+                    st.markdown(
+                        f'<div class="log-entry">'
+                        f'<span class="log-timestamp">{timestamp}</span>'
+                        f'<span class="log-level-{level}">[{level}]</span> '
+                        f'{message}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                except:
+                    # Fallback for any malformed logs
+                    st.markdown(
+                        f'<div class="log-entry">{log.strip()}</div>',
+                        unsafe_allow_html=True
+                    )
+            st.markdown('</div>', unsafe_allow_html=True)
+    
+    with log_col2:
+        st.markdown(
+            f'<h3>🤖 {AVAILABLE_MODELS[st.session_state.selected_model]}</h3>',
+            unsafe_allow_html=True
+        )
+        if not st.session_state.app_logs_2:
+            st.info("Нет доступных логов")
+        else:
+            st.markdown('<div class="log-container">', unsafe_allow_html=True)
+            for log in reversed(st.session_state.app_logs_2):
+                try:
+                    # Expected format: 2024-01-01 12:34:56,789 [LEVEL] Message
+                    timestamp = log[:23]
+                    level_start = log.find('[') + 1
+                    level_end = log.find(']')
+                    level = log[level_start:level_end]
+                    message = log[level_end + 2:].strip()
+                    
+                    # Format log entry with HTML
+                    st.markdown(
+                        f'<div class="log-entry">'
+                        f'<span class="log-timestamp">{timestamp}</span>'
+                        f'<span class="log-level-{level}">[{level}]</span> '
+                        f'{message}'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                except:
+                    # Fallback for any malformed logs
+                    st.markdown(
+                        f'<div class="log-entry">{log.strip()}</div>',
+                        unsafe_allow_html=True
+                    )
+            st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
