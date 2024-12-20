@@ -9,22 +9,22 @@ import numpy as np
 import subprocess
 import sys
 
-def get_spacy_model():
-    """Get the Russian language model, with fallback to simpler tokenization."""
+def ensure_spacy_model():
+    """Download and load the Russian language model."""
+    model_name = 'ru_core_news_sm'
     try:
-        return spacy.load('ru_core_news_sm')
+        return spacy.load(model_name)
     except OSError:
-        print("Warning: Russian language model not found. Using basic tokenization.")
-        # Create a basic pipeline with just tokenizer
-        nlp = spacy.blank('ru')
-        return nlp
+        print(f"Downloading {model_name} model...")
+        spacy.cli.download(model_name)
+        return spacy.load(model_name)
 
-# Initialize spaCy with fallback
-nlp = get_spacy_model()
+# Initialize spaCy
+nlp = ensure_spacy_model()
 
 def tokenize_text(text: str, nlp: Language) -> List[str]:
     """
-    Tokenize text using spaCy with fallback to basic tokenization.
+    Tokenize text using spaCy's Russian model.
     
     Args:
         text: Text to tokenize
@@ -34,14 +34,8 @@ def tokenize_text(text: str, nlp: Language) -> List[str]:
         List of tokens
     """
     doc = nlp(text.lower())
-    # Basic tokenization if full model not available
-    tokens = []
-    for token in doc:
-        if token.is_punct or token.is_space:
-            continue
-        # Use lemma if available, otherwise use the token text
-        tokens.append(token.lemma_ if token.has_vector else token.text)
-    return tokens
+    # Use lemmatization for better matching
+    return [token.lemma_ for token in doc if not token.is_punct and not token.is_space]
 
 def calculate_metrics(generated_review: str, reference_reviews: List[str]) -> List[Dict[str, float]]:
     """
