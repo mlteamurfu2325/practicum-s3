@@ -16,6 +16,7 @@ load_dotenv()
 
 # Set up logging
 os.makedirs('logs', exist_ok=True)
+os.chmod('logs', 0o777)  # Ensure logs directory is writable
 logging.basicConfig(
     filename=f'logs/app-{datetime.now():%Y-%m-%d}.log',
     level=logging.INFO,
