@@ -8,7 +8,14 @@ load_dotenv()
 # OpenRouter configuration
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-MODEL_NAME = "google/gemini-flash-1.5"
+
+# Model configuration
+DEFAULT_MODEL = "google/gemini-flash-1.5"
+AVAILABLE_MODELS = {
+    "google/gemini-flash-1.5": "Google Gemini Flash 1.5",
+    "openai/gpt-4o-mini": "GPT-4o Mini",
+    "amazon/nova-lite-v1": "Amazon Nova Lite"
+}
 
 # Validation settings
 MAX_RETRIES = 3
